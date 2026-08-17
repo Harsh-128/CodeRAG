@@ -14,7 +14,8 @@ export interface VectorPayload {
   filePath: string;
   language: string;
   symbolName?: string;
-  symbolType: string;
+parentName?: string;
+symbolType: string;
   startLine: number;
   endLine: number;
   content: string;

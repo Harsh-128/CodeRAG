@@ -1,6 +1,11 @@
 import fs from "fs/promises";
 import path from "path";
-import { indexJavaScriptFile } from "./indexing.service.js";
+import {
+  indexSourceFile,
+} from "./indexing.service.js";
+import {
+  detectLanguage,
+} from "./language-detection.service.js";
 
 const IGNORED_DIRECTORIES = new Set([
   "node_modules",
@@ -9,6 +14,18 @@ const IGNORED_DIRECTORIES = new Set([
   "dist",
   "build",
   "vendor",
+  ".next",
+  ".nuxt",
+  "target",
+  "out",
+  "bin",
+  "obj",
+  "venv",
+  ".venv",
+  "__pycache__",
+  ".gradle",
+  ".idea",
+  ".vscode",
 ]);
 
 const SUPPORTED_EXTENSIONS = new Set([
@@ -16,14 +33,22 @@ const SUPPORTED_EXTENSIONS = new Set([
   ".jsx",
   ".ts",
   ".tsx",
+  ".py",
+  ".go",
+  ".java",
 ]);
+
+const MAX_FILE_SIZE = 1_000_000;
 
 async function collectSourceFiles(
   directory: string
 ): Promise<string[]> {
-  const entries = await fs.readdir(directory, {
-    withFileTypes: true,
-  });
+  const entries = await fs.readdir(
+    directory,
+    {
+      withFileTypes: true,
+    }
+  );
 
   const files: string[] = [];
 
@@ -35,7 +60,10 @@ async function collectSourceFiles(
       continue;
     }
 
-    const fullPath = path.join(directory, entry.name);
+    const fullPath = path.join(
+      directory,
+      entry.name
+    );
 
     if (entry.isDirectory()) {
       files.push(
@@ -44,14 +72,32 @@ async function collectSourceFiles(
       continue;
     }
 
+    if (!entry.isFile()) {
+      continue;
+    }
+
+    const extension = path
+      .extname(entry.name)
+      .toLowerCase();
+
     if (
-      entry.isFile() &&
-      SUPPORTED_EXTENSIONS.has(
-        path.extname(entry.name).toLowerCase()
+      !SUPPORTED_EXTENSIONS.has(
+        extension
       )
     ) {
-      files.push(fullPath);
+      continue;
     }
+
+    const stats = await fs.stat(fullPath);
+
+    if (stats.size > MAX_FILE_SIZE) {
+      console.log(
+        `[Skipped] ${fullPath} → file too large`
+      );
+      continue;
+    }
+
+    files.push(fullPath);
   }
 
   return files;
@@ -64,34 +110,53 @@ export async function indexRepository(
   filesProcessed: number;
   chunksIndexed: number;
 }> {
-  const files = await collectSourceFiles(repositoryPath);
+  const files =
+    await collectSourceFiles(
+      repositoryPath
+    );
 
   let filesProcessed = 0;
   let chunksIndexed = 0;
 
   for (const filePath of files) {
-    const sourceCode = await fs.readFile(
-      filePath,
-      "utf-8"
-    );
-
     const relativePath = path
-      .relative(repositoryPath, filePath)
+      .relative(
+        repositoryPath,
+        filePath
+      )
       .split(path.sep)
       .join("/");
 
+    const language =
+      detectLanguage(relativePath);
+
+    if (!language) {
+      continue;
+    }
+
     try {
-      const chunkCount = await indexJavaScriptFile(
-        repositoryName,
-        relativePath,
-        sourceCode
-      );
+      const sourceCode =
+        await fs.readFile(
+          filePath,
+          "utf-8"
+        );
+
+      const chunkCount =
+        await indexSourceFile(
+          repositoryName,
+          relativePath,
+          sourceCode,
+          language
+        );
 
       filesProcessed++;
-      chunksIndexed += chunkCount;
+      chunksIndexed +=
+        chunkCount;
 
       console.log(
-        `[Indexed] ${relativePath} → ${chunkCount} chunks`
+        `[Indexed] ${relativePath} ` +
+        `(${language}) → ` +
+        `${chunkCount} chunks`
       );
     } catch (error) {
       console.error(
