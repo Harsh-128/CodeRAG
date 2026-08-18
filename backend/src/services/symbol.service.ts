@@ -314,6 +314,10 @@ if (!identifiers || identifiers.length === 0) {
 }
 
 const ignoredWords = new Set([
+  "references",
+  "calls",
+  "invocations",
+  "instantiation",
   "where",
   "what",
   "which",
