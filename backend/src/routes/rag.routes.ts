@@ -103,7 +103,8 @@ export async function ragRoutes(app: FastifyInstance) {
       const results = await hybridSearchCode(
         question,
         5,
-        repositoryName
+        repositoryName,
+        language
       );
 
       /*

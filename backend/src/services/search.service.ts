@@ -21,21 +21,34 @@ export interface SearchResult {
 export async function searchCode(
   query: string,
   limit = 5,
-  repositoryName?: string
+  repositoryName?: string,
+  language?: string
 ): Promise<SearchResult[]> {
   const embedding = await generateEmbedding(query);
 
-  const filter = repositoryName
-    ? {
-        must: [
-          {
-            key: "repository",
-            match: {
-              value: repositoryName,
-            },
-          },
-        ],
-      }
+  const must: Array<Record<string, unknown>> = [];
+
+if (repositoryName) {
+  must.push({
+    key: "repository",
+    match: {
+      value: repositoryName,
+    },
+  });
+}
+
+if (language) {
+  must.push({
+    key: "language",
+    match: {
+      value: language,
+    },
+  });
+}
+
+const filter =
+  must.length > 0
+    ? { must }
     : undefined;
 
   const response = await qdrant.query(COLLECTION_NAME, {
@@ -55,13 +68,15 @@ export async function searchCode(
 export async function hybridSearchCode(
   query: string,
   limit = 5,
-  repositoryName?: string
+  repositoryName?: string,
+  language?: string
 ): Promise<SearchResult[]> {
   // First get a larger semantic candidate set.
     const semanticResults = await searchCode(
   query,
   20,
-  repositoryName
+  repositoryName,
+  language
 );
   // Normalize the user's query into searchable terms.
   const queryTerms = query
