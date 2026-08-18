@@ -297,7 +297,7 @@ const navigationQuestion =
    * Otherwise look for code-like identifiers.
    */
   const identifiers = question.match(
-  /\b[A-Z][A-Za-z0-9_$]*\b/g
+  /\b[A-Za-z_$][A-Za-z0-9_$]*\b/g
 );
 
 if (!identifiers || identifiers.length === 0) {
@@ -305,20 +305,46 @@ if (!identifiers || identifiers.length === 0) {
 }
 
 const ignoredWords = new Set([
-  "Where",
-  "What",
-  "Which",
-  "Who",
-  "How",
-  "When",
-  "Why",
-  "Show",
-  "Tell",
+  "where",
+  "what",
+  "which",
+  "who",
+  "how",
+  "when",
+  "why",
+  "show",
+  "tell",
+  "is",
+  "are",
+  "was",
+  "were",
+  "the",
+  "a",
+  "an",
+  "in",
+  "of",
+  "to",
+  "for",
+  "from",
+  "on",
+  "at",
+  "defined",
+  "definition",
+  "used",
+  "usage",
+  "referenced",
+  "reference",
+  "called",
+  "invoked",
+  "created",
+  "located",
 ]);
 
 const symbolName =
-  identifiers.find((identifier) => !ignoredWords.has(identifier)) ??
-  identifiers[0];
+  identifiers.find(
+    (identifier) =>
+      !ignoredWords.has(identifier.toLowerCase())
+  ) ?? identifiers[0];
 
 if (usageQuestion) {
   return findSymbolUsages(
