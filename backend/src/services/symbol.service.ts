@@ -21,14 +21,7 @@ export async function findSymbol(
   language?: string,
   limit = 10
 ): Promise<SymbolSearchResult[]> {
-  const must: Array<Record<string, unknown>> = [
-    {
-      key: "symbolName",
-      match: {
-        value: symbolName,
-      },
-    },
-  ];
+  const must: Array<Record<string, unknown>> = [];
 
   if (repositoryName) {
     must.push({
@@ -51,7 +44,7 @@ export async function findSymbol(
   const response = await qdrant.scroll(
     COLLECTION_NAME,
     {
-      limit,
+      limit: 1000,
       with_payload: true,
       with_vector: false,
       filter: {
@@ -60,10 +53,19 @@ export async function findSymbol(
     }
   );
 
-  return response.points.map((point) => ({
-    id: point.id,
-    payload: point.payload as SymbolSearchResult["payload"],
-  }));
+  const normalizedSymbolName = symbolName.toLowerCase();
+
+  return response.points
+    .map((point) => ({
+      id: point.id,
+      payload: point.payload as SymbolSearchResult["payload"],
+    }))
+    .filter(
+      (result) =>
+        result.payload.symbolName?.toLowerCase() ===
+        normalizedSymbolName
+    )
+    .slice(0, limit);
 }
 
 export async function findSymbolsByParent(
