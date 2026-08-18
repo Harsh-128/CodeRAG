@@ -227,8 +227,8 @@ export function isSymbolNavigationQuestion(question: string): boolean {
     .replace(/[^a-z0-9_]+/g, " ")
     .trim();
 
-  return /\b(where|defined|definition|constructed|constructor|created|located|show|used|usage|usages|referenced|references|reference|called|calls|invoked|invocations|instantiated|instantiation)\b/
-    .test(normalized);
+  return /\b(where|defined|definition|constructed|constructor|created|located|show|used|usage|usages|referenced|references|reference|called|calls|invoked|invocations|instantiated|instantiation|does|work)\b/
+  .test(normalized);
 }
 
 export async function lookupSymbolsForQuestion(
@@ -316,6 +316,8 @@ if (!identifiers || identifiers.length === 0) {
 const ignoredWords = new Set([
   "references",
   "calls",
+  "does",
+  "do",
   "invocations",
   "instantiation",
   "where",
