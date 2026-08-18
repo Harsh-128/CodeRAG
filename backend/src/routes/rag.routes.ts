@@ -2,7 +2,10 @@ import { FastifyInstance } from "fastify";
 import { hybridSearchCode } from "../services/search.service.js";
 import { buildContext } from "../services/context.service.js";
 import { generateAnswer } from "../services/llm.service.js";
-import { lookupSymbolsForQuestion } from "../services/symbol.service.js";
+import {
+  lookupSymbolsForQuestion,
+  isSymbolNavigationQuestion,
+} from "../services/symbol.service.js";
 
 export async function ragRoutes(app: FastifyInstance) {
   app.post("/api/ask", async (request, reply) => {
@@ -31,7 +34,18 @@ export async function ragRoutes(app: FastifyInstance) {
         repositoryName,
         language
       );
-
+      if (
+        isSymbolNavigationQuestion(question) &&
+        symbolResults.length === 0
+      ) {
+        return {
+          question,
+          repository: repositoryName ?? null,
+          answer: "No matching symbol implementations were found.",
+          sources: [],
+          mode: "symbol-navigation",
+        };
+      }
       /*
        * 2. Symbol/navigation path
        */
