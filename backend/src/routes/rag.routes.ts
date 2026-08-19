@@ -102,17 +102,27 @@ export async function ragRoutes(app: FastifyInstance) {
       /*
        * 3. Normal semantic + lexical RAG path
        */
-      const results = await hybridSearchCode(
-        question,
-        5,
-        repositoryName,
-        language
-      );
+      const broadRepositoryQuestion =
+  /\b(repository|codebase|project|components|architecture|structure|flow|overview)\b/i.test(
+    question
+  );
+
+const searchLimit = broadRepositoryQuestion ? 10 : 5;
+
+const results = await hybridSearchCode(
+  question,
+  searchLimit,
+  repositoryName,
+  language
+);
 
       /*
        * 4. Build focused context
        */
-      const context = buildContext(results);
+      const context = buildContext(
+  results,
+  broadRepositoryQuestion
+);
 
       /*
        * 5. Generate grounded answer
@@ -125,9 +135,13 @@ export async function ragRoutes(app: FastifyInstance) {
       /*
        * 6. Return sources
        */
-      const sources = results
-        .filter((result) => result.score >= 0.70)
-        .slice(0, 3)
+      const sourceThreshold = broadRepositoryQuestion
+  ? 0.45
+  : 0.70;
+
+const sources = results
+  .filter((result) => result.score >= sourceThreshold)
+  .slice(0, 3)
         .map((result) => ({
           file: result.payload.filePath,
           symbol: result.payload.symbolName ?? null,

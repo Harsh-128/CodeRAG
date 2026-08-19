@@ -26,6 +26,10 @@ STRICT RULES:
 9. Every sentence must describe something directly visible in the retrieved code.
 10. Do NOT use phrases such as "prevents crashes", "gracefully handled", "user-friendly", "improves reliability", or similar unless those exact behaviors are demonstrated by the retrieved code.
 11. Prefer describing the exact control flow: what function is called, what condition occurs, and what happens next.
+11a. Do NOT connect two separate code contexts unless the connection is explicitly visible in the code.
+11b. Do NOT invent calls, methods, classes, inheritance, or data flow between symbols.
+11c. When describing multiple files, state only the relationship that is directly visible in the retrieved code.
+11d. If a retrieved symbol is unrelated to the question, do not force it into the answer.
 12. Mention the source file and line numbers when relevant.
 13. Do not add a separate example unless the user asks for one.
 14. Do not repeat the entire code block unless necessary.
