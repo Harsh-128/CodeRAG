@@ -12,6 +12,7 @@ export interface SymbolSearchResult {
   id: string | number;
   payload: VectorPayload & {
     chunkId?: string;
+    usageLine?: number;
   };
 }
 
@@ -206,54 +207,87 @@ async function findSymbolUsages(
     `\\b${escaped}\\b`
   );
 
+  const declarationTypes = new Set([
+    "class_declaration",
+    "interface_declaration",
+    "enum_declaration",
+    "record_declaration",
+    "type_declaration",
+    "class_definition",
+    "function_declaration",
+    "function_definition",
+    "method_declaration",
+    "method_definition",
+    "constructor_declaration",
+  ]);
+
+  const normalizedTarget =
+    symbolName.toLowerCase();
+
   return response.points
-  .map((point) => ({
-    id: point.id,
-    payload: point.payload as SymbolSearchResult["payload"],
-  }))
-  .filter((result) => {
-    const payload = result.payload;
+    .map((point) => ({
+      id: point.id,
+      payload:
+        point.payload as SymbolSearchResult["payload"],
+    }))
+    .filter((result) => {
+      const payload = result.payload;
 
-    if (!payload.content) {
-      return false;
-    }
+      if (!payload.content) {
+        return false;
+      }
 
-    /*
-     * A symbol's own declaration/definition is not a usage.
-     * Keep surrounding code such as test methods and callers.
-     */
-    const declarationTypes = new Set([
-      "class_declaration",
-      "interface_declaration",
-      "enum_declaration",
-      "record_declaration",
-      "type_declaration",
-      "class_definition",
-      "function_declaration",
-      "function_definition",
-      "method_declaration",
-      "method_definition",
-      "constructor_declaration",
-    ]);
+      const normalizedSymbol =
+        payload.symbolName?.toLowerCase();
 
-    const normalizedSymbol =
-      payload.symbolName?.toLowerCase();
+      if (
+        normalizedSymbol === normalizedTarget &&
+        declarationTypes.has(
+          payload.symbolType?.toLowerCase() ?? ""
+        )
+      ) {
+        return false;
+      }
 
-    const normalizedTarget =
-      symbolName.toLowerCase();
+      if (
+        declarationTypes.has(
+          payload.symbolType?.toLowerCase() ?? ""
+        ) &&
+        (
+          payload.symbolType === "class_declaration" ||
+          payload.symbolType === "class_definition" ||
+          payload.symbolType === "interface_declaration" ||
+          payload.symbolType === "enum_declaration" ||
+          payload.symbolType === "record_declaration" ||
+          payload.symbolType === "type_declaration"
+        )
+      ) {
+        return false;
+      }
 
-    if (
-      normalizedSymbol === normalizedTarget &&
-      declarationTypes.has(
-        payload.symbolType?.toLowerCase() ?? ""
-      )
-    ) {
-      return false;
-    }
+      const match =
+        usageRegex.exec(payload.content);
 
-    return usageRegex.test(payload.content);
-  });
+      if (!match) {
+        return false;
+      }
+
+      const contentBeforeMatch =
+        payload.content.slice(
+          0,
+          match.index
+        );
+
+      const relativeLine =
+        contentBeforeMatch.split("\n").length - 1;
+
+      payload.usageLine =
+        payload.startLine + relativeLine;
+
+      return true;
+    });
 }
+
 export function isSymbolNavigationQuestion(question: string): boolean {
   const normalized = question
     .toLowerCase()

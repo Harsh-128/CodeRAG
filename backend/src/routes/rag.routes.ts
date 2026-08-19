@@ -64,6 +64,7 @@ export async function ragRoutes(app: FastifyInstance) {
               `Parent: ${payload.parentName ?? "none"}`,
               `Type: ${payload.symbolType}`,
               `Lines: ${payload.startLine}-${payload.endLine}`,
+              `Usage Line: ${payload.usageLine ?? "not applicable"}`,
               "",
               payload.content,
               "",
@@ -86,6 +87,7 @@ export async function ragRoutes(app: FastifyInstance) {
             language: result.payload.language,
             startLine: result.payload.startLine,
             endLine: result.payload.endLine,
+            usageLine: result.payload.usageLine ?? null,
           }));
 
         return {
