@@ -7,6 +7,7 @@ import {
   isSymbolNavigationQuestion,
   getRepositorySymbolInventory,
   isRepositoryInventoryQuestion,
+  getRepositoryInventoryQuestionType,
 } from "../services/symbol.service.js";
 
 export async function ragRoutes(app: FastifyInstance) {
@@ -139,39 +140,79 @@ export async function ragRoutes(app: FastifyInstance) {
           await getRepositorySymbolInventory(
             repositoryName
           );
+        const inventoryType =
+          getRepositoryInventoryQuestionType(question);
 
         const inventoryContext = [
           "--- Repository Inventory ---",
           `Repository: ${inventory.repository}`,
           `Files (${inventory.files.length}):`,
-          ...inventory.files.map(
-            (file) => `- ${file}`
-          ),
-          "",
-          `Symbols (${inventory.symbols.length}):`,
-          ...inventory.symbols
-            .slice(0, 50)
-            .map((symbol) => {
-              const parent = symbol.parentName
-                ? ` | parent: ${symbol.parentName}`
-                : "";
+          ...inventory.fileInventory.map((file) => {
+            const symbols =
+              file.symbols.length === 0
+                ? "  (no extracted symbols)"
+                : file.symbols
+                    .map((symbol) => {
+                      const parent =
+                        symbol.parentName
+                          ? ` | parent: ${symbol.parentName}`
+                          : "";
 
-              return [
-                `- ${symbol.name}`,
-                symbol.type,
-                `${symbol.filePath}:${symbol.startLine}-${symbol.endLine}`,
-                symbol.language,
-                parent,
-              ].join(" | ");
-            }),
+                      return [
+                        `  - ${symbol.name}`,
+                        symbol.type,
+                        `${symbol.startLine}-${symbol.endLine}`,
+                        parent,
+                      ].join(" | ");
+                    })
+                    .join("\n");
+
+            return [
+              `- ${file.filePath} (${file.language})`,
+              symbols,
+            ].join("\n");
+          }),
           "",
+          `Total symbols: ${inventory.symbols.length}`,
           "--- End Repository Inventory ---",
         ].join("\n");
 
-        const answer = await generateAnswer(
-          question,
-          inventoryContext
-        );
+        let answer: string;
+
+        if (inventoryType === "files") {
+        answer = [
+        `The repository contains ${inventory.files.length} files:`,
+        ...inventory.files.map(
+        (file) => `- ${file}`
+          ),
+          ].join("\n");
+          } else if (inventoryType === "symbols") {
+          const symbolLines = inventory.fileInventory.flatMap(
+      (file) =>
+        file.symbols.map((symbol) => {
+          const parent = symbol.parentName
+            ? ` | parent: ${symbol.parentName}`
+            : "";
+
+          return [
+            `- ${symbol.name}`,
+            `(${symbol.type})`,
+            `— ${file.filePath}:${symbol.startLine}-${symbol.endLine}`,
+            parent,
+          ].join(" ");
+        })
+    );
+
+  answer = [
+    `The repository contains ${inventory.symbols.length} symbols across ${inventory.files.length} files:`,
+    ...symbolLines,
+  ].join("\n");
+} else {
+  answer = await generateAnswer(
+    question,
+    inventoryContext
+  );
+}
 
         return {
           question,

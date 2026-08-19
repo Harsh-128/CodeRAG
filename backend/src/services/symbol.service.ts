@@ -515,6 +515,17 @@ return findSymbol(
 export interface RepositorySymbolInventory {
   repository: string;
   files: string[];
+  fileInventory: Array<{
+    filePath: string;
+    language: string;
+    symbols: Array<{
+      name: string;
+      type: string;
+      parentName?: string;
+      startLine: number;
+      endLine: number;
+    }>;
+  }>;
   symbols: Array<{
     name: string;
     type: string;
@@ -531,6 +542,11 @@ export async function getRepositorySymbolInventory(
 ): Promise<RepositorySymbolInventory> {
   const files = new Set<string>();
   const symbols = new Map<string, RepositorySymbolInventory["symbols"][number]>();
+
+  const fileSymbols = new Map<
+    string,
+    RepositorySymbolInventory["fileInventory"][number]
+  >();
 
   let offset: Awaited<ReturnType<typeof qdrant.scroll>>["next_page_offset"] = null;
 
@@ -558,6 +574,14 @@ export async function getRepositorySymbolInventory(
 
       if (payload.filePath) {
         files.add(payload.filePath);
+
+        if (!fileSymbols.has(payload.filePath)) {
+          fileSymbols.set(payload.filePath, {
+            filePath: payload.filePath,
+            language: payload.language,
+            symbols: [],
+          });
+        }
       }
 
       if (
@@ -577,15 +601,44 @@ export async function getRepositorySymbolInventory(
         payload.endLine,
       ].join(":");
 
+      const symbol = {
+        name: payload.symbolName,
+        type: payload.symbolType,
+        filePath: payload.filePath,
+        parentName: payload.parentName,
+        language: payload.language,
+        startLine: payload.startLine,
+        endLine: payload.endLine,
+      };
+
       if (!symbols.has(symbolKey)) {
-        symbols.set(symbolKey, {
-          name: payload.symbolName,
-          type: payload.symbolType,
-          filePath: payload.filePath,
-          parentName: payload.parentName,
-          language: payload.language,
-          startLine: payload.startLine,
-          endLine: payload.endLine,
+        symbols.set(symbolKey, symbol);
+      }
+
+      const fileEntry = fileSymbols.get(
+        payload.filePath
+      )!;
+
+      const alreadyInFile =
+        fileEntry.symbols.some(
+          (existing) =>
+            existing.name === symbol.name &&
+            existing.type === symbol.type &&
+            existing.parentName ===
+              symbol.parentName &&
+            existing.startLine ===
+              symbol.startLine &&
+            existing.endLine ===
+              symbol.endLine
+        );
+
+      if (!alreadyInFile) {
+        fileEntry.symbols.push({
+          name: symbol.name,
+          type: symbol.type,
+          parentName: symbol.parentName,
+          startLine: symbol.startLine,
+          endLine: symbol.endLine,
         });
       }
     }
@@ -596,6 +649,20 @@ export async function getRepositorySymbolInventory(
   return {
     repository: repositoryName,
     files: Array.from(files).sort(),
+    fileInventory: Array.from(
+      fileSymbols.values()
+    )
+      .map((file) => ({
+        ...file,
+        symbols: file.symbols.sort(
+          (a, b) =>
+            a.startLine - b.startLine ||
+            a.name.localeCompare(b.name)
+        ),
+      }))
+      .sort((a, b) =>
+        a.filePath.localeCompare(b.filePath)
+      ),
     symbols: Array.from(symbols.values()).sort(
       (a, b) =>
         a.filePath.localeCompare(b.filePath) ||
@@ -604,7 +671,6 @@ export async function getRepositorySymbolInventory(
     ),
   };
 }
-
 export function isRepositoryInventoryQuestion(
   question: string
 ): boolean {
@@ -625,4 +691,31 @@ export function isRepositoryInventoryQuestion(
     ) ||
     /\bcomponents\b/.test(normalized)
   );
+}
+export type RepositoryInventoryQuestionType =
+  | "files"
+  | "symbols"
+  | "overview";
+
+export function getRepositoryInventoryQuestionType(
+  question: string
+): RepositoryInventoryQuestionType {
+  const normalized = question
+    .toLowerCase()
+    .replace(/[^a-z0-9_$]+/g, " ")
+    .trim();
+
+  if (/\b(files?|file)\b/.test(normalized)) {
+    return "files";
+  }
+
+  if (
+    /\b(functions?|methods?|symbols?|classes?)\b/.test(
+      normalized
+    )
+  ) {
+    return "symbols";
+  }
+
+  return "overview";
 }
