@@ -6,6 +6,7 @@ import {
   lookupSymbolsForQuestion,
   isSymbolNavigationQuestion,
   getRepositorySymbolInventory,
+  isRepositoryInventoryQuestion,
 } from "../services/symbol.service.js";
 
 export async function ragRoutes(app: FastifyInstance) {
@@ -127,7 +128,71 @@ export async function ragRoutes(app: FastifyInstance) {
       }
 
       /*
-       * 3. Normal semantic + lexical RAG path
+       * 3. Repository inventory path
+       */
+      if (
+        repositoryName &&
+        !language &&
+        isRepositoryInventoryQuestion(question)
+      ) {
+        const inventory =
+          await getRepositorySymbolInventory(
+            repositoryName
+          );
+
+        const inventoryContext = [
+          "--- Repository Inventory ---",
+          `Repository: ${inventory.repository}`,
+          `Files (${inventory.files.length}):`,
+          ...inventory.files.map(
+            (file) => `- ${file}`
+          ),
+          "",
+          `Symbols (${inventory.symbols.length}):`,
+          ...inventory.symbols
+            .slice(0, 50)
+            .map((symbol) => {
+              const parent = symbol.parentName
+                ? ` | parent: ${symbol.parentName}`
+                : "";
+
+              return [
+                `- ${symbol.name}`,
+                symbol.type,
+                `${symbol.filePath}:${symbol.startLine}-${symbol.endLine}`,
+                symbol.language,
+                parent,
+              ].join(" | ");
+            }),
+          "",
+          "--- End Repository Inventory ---",
+        ].join("\n");
+
+        const answer = await generateAnswer(
+          question,
+          inventoryContext
+        );
+
+        return {
+          question,
+          repository: repositoryName,
+          answer,
+          sources: inventory.symbols
+            .slice(0, 5)
+            .map((symbol) => ({
+              file: symbol.filePath,
+              symbol: symbol.name,
+              parent: symbol.parentName ?? null,
+              language: symbol.language,
+              startLine: symbol.startLine,
+              endLine: symbol.endLine,
+            })),
+          mode: "repository-inventory",
+        };
+      }
+
+      /*
+       * 4. Normal semantic + lexical RAG path
        */
       const broadRepositoryQuestion =
   /\b(repository|codebase|project|components|architecture|structure|flow|overview)\b/i.test(

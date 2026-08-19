@@ -604,3 +604,25 @@ export async function getRepositorySymbolInventory(
     ),
   };
 }
+
+export function isRepositoryInventoryQuestion(
+  question: string
+): boolean {
+  const normalized = question
+    .toLowerCase()
+    .replace(/[^a-z0-9_$]+/g, " ")
+    .trim();
+
+  return (
+    /\b(repository|codebase|project)\s+(structure|overview)\b/.test(
+      normalized
+    ) ||
+    /\bwhat\s+(files|symbols|functions|classes)\b/.test(
+      normalized
+    ) ||
+    /\b(project|repository|codebase)\s+files\b/.test(
+      normalized
+    ) ||
+    /\bcomponents\b/.test(normalized)
+  );
+}
