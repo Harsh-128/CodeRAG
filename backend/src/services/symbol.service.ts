@@ -511,3 +511,96 @@ return findSymbol(
   language
 );
 }
+
+export interface RepositorySymbolInventory {
+  repository: string;
+  files: string[];
+  symbols: Array<{
+    name: string;
+    type: string;
+    filePath: string;
+    parentName?: string;
+    language: string;
+    startLine: number;
+    endLine: number;
+  }>;
+}
+
+export async function getRepositorySymbolInventory(
+  repositoryName: string
+): Promise<RepositorySymbolInventory> {
+  const files = new Set<string>();
+  const symbols = new Map<string, RepositorySymbolInventory["symbols"][number]>();
+
+  let offset: Awaited<ReturnType<typeof qdrant.scroll>>["next_page_offset"] = null;
+
+  do {
+    const response = await qdrant.scroll(COLLECTION_NAME, {
+      limit: 1000,
+      offset: offset ?? undefined,
+      with_payload: true,
+      with_vector: false,
+      filter: {
+        must: [
+          {
+            key: "repository",
+            match: {
+              value: repositoryName,
+            },
+          },
+        ],
+      },
+    });
+
+    for (const point of response.points) {
+      const payload =
+        point.payload as VectorPayload;
+
+      if (payload.filePath) {
+        files.add(payload.filePath);
+      }
+
+      if (
+        !payload.symbolName ||
+        !payload.symbolType ||
+        !payload.filePath
+      ) {
+        continue;
+      }
+
+      const symbolKey = [
+        payload.filePath,
+        payload.symbolName,
+        payload.symbolType,
+        payload.parentName ?? "",
+        payload.startLine,
+        payload.endLine,
+      ].join(":");
+
+      if (!symbols.has(symbolKey)) {
+        symbols.set(symbolKey, {
+          name: payload.symbolName,
+          type: payload.symbolType,
+          filePath: payload.filePath,
+          parentName: payload.parentName,
+          language: payload.language,
+          startLine: payload.startLine,
+          endLine: payload.endLine,
+        });
+      }
+    }
+
+    offset = response.next_page_offset ?? null;
+  } while (offset !== null);
+
+  return {
+    repository: repositoryName,
+    files: Array.from(files).sort(),
+    symbols: Array.from(symbols.values()).sort(
+      (a, b) =>
+        a.filePath.localeCompare(b.filePath) ||
+        a.startLine - b.startLine ||
+        a.name.localeCompare(b.name)
+    ),
+  };
+}

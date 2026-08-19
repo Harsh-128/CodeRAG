@@ -5,9 +5,36 @@ import { generateAnswer } from "../services/llm.service.js";
 import {
   lookupSymbolsForQuestion,
   isSymbolNavigationQuestion,
+  getRepositorySymbolInventory,
 } from "../services/symbol.service.js";
 
 export async function ragRoutes(app: FastifyInstance) {
+  app.get(
+  "/api/repository/:repositoryName/inventory",
+  async (request, reply) => {
+    const { repositoryName } = request.params as {
+      repositoryName?: string;
+    };
+
+    if (!repositoryName || !repositoryName.trim()) {
+      return reply.status(400).send({
+        error: "repositoryName is required",
+      });
+    }
+
+    try {
+      return await getRepositorySymbolInventory(
+        repositoryName.trim()
+      );
+    } catch (error) {
+      app.log.error(error);
+
+      return reply.status(500).send({
+        error: "Failed to build repository symbol inventory",
+      });
+    }
+  }
+);
   app.post("/api/ask", async (request, reply) => {
     const body = request.body as {
       question?: string;
