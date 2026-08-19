@@ -207,19 +207,52 @@ async function findSymbolUsages(
   );
 
   return response.points
-    .map((point) => ({
-      id: point.id,
-      payload: point.payload as SymbolSearchResult["payload"],
-    }))
-    .filter((result) => {
-      const payload = result.payload;
+  .map((point) => ({
+    id: point.id,
+    payload: point.payload as SymbolSearchResult["payload"],
+  }))
+  .filter((result) => {
+    const payload = result.payload;
 
-      if (!payload.content) {
-        return false;
-      }
+    if (!payload.content) {
+      return false;
+    }
 
-      return usageRegex.test(payload.content);
-    });
+    /*
+     * A symbol's own declaration/definition is not a usage.
+     * Keep surrounding code such as test methods and callers.
+     */
+    const declarationTypes = new Set([
+      "class_declaration",
+      "interface_declaration",
+      "enum_declaration",
+      "record_declaration",
+      "type_declaration",
+      "class_definition",
+      "function_declaration",
+      "function_definition",
+      "method_declaration",
+      "method_definition",
+      "constructor_declaration",
+    ]);
+
+    const normalizedSymbol =
+      payload.symbolName?.toLowerCase();
+
+    const normalizedTarget =
+      symbolName.toLowerCase();
+
+    if (
+      normalizedSymbol === normalizedTarget &&
+      declarationTypes.has(
+        payload.symbolType?.toLowerCase() ?? ""
+      )
+    ) {
+      return false;
+    }
+
+    return usageRegex.test(payload.content);
+  });
 }
 export function isSymbolNavigationQuestion(question: string): boolean {
   const normalized = question

@@ -108,3 +108,79 @@ test("finds Java getName", async () => {
     "UserService.java"
   );
 });
+test("finds actual getName usage but excludes its definition", async () => {
+  const results = await lookupSymbolsForQuestion(
+    "Where is getName called?",
+    "multilang"
+  );
+
+  assert.ok(results.length > 0);
+
+  assert.equal(
+    results.some(
+      (result) =>
+        result.payload.symbolName === "getName" &&
+        (
+          result.payload.symbolType === "method_declaration" ||
+          result.payload.symbolType === "method_definition"
+        )
+    ),
+    false
+  );
+
+  assert.equal(
+    results.some(
+      (result) =>
+        result.payload.filePath === "UserServiceTest.java"
+    ),
+    true
+  );
+});
+
+test("finds UserService usage without returning its definitions", async () => {
+  const results = await lookupSymbolsForQuestion(
+    "Where is UserService used?",
+    "multilang"
+  );
+
+  assert.ok(results.length > 0);
+
+  assert.equal(
+    results.some(
+      (result) =>
+        result.payload.symbolName === "UserService" &&
+        (
+          result.payload.symbolType === "class_declaration" ||
+          result.payload.symbolType === "class_definition" ||
+          result.payload.symbolType === "constructor_declaration"
+        )
+    ),
+    false
+  );
+
+  assert.equal(
+    results.some(
+      (result) =>
+        result.payload.filePath === "UserServiceTest.java"
+    ),
+    true
+  );
+});
+
+test("finds UserService instantiation in main", async () => {
+  const results = await lookupSymbolsForQuestion(
+    "Where is UserService instantiated?",
+    "multilang"
+  );
+
+  assert.ok(results.length > 0);
+
+  assert.equal(
+    results.some(
+      (result) =>
+        result.payload.filePath === "UserServiceTest.java" &&
+        result.payload.symbolName === "main"
+    ),
+    true
+  );
+});
