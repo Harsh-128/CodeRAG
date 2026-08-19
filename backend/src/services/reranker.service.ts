@@ -52,7 +52,8 @@ function detectQueryLanguage(
 export function rerankResults(
   query: string,
   results: SearchResult[],
-  limit = 5
+  limit = 5,
+  broadRepositoryQuestion = false
 ): SearchResult[] {
   const normalizedQuery = normalize(query);
   const queryTerms = getQueryTerms(query);
@@ -75,6 +76,30 @@ export function rerankResults(
       result.payload.symbolType?.toLowerCase() ?? "";
 
     let bonus = 0;
+    if (broadRepositoryQuestion) {
+  const structuralType =
+    symbolType === "class_declaration" ||
+    symbolType === "class_definition" ||
+    symbolType === "interface_declaration" ||
+    symbolType === "enum_declaration" ||
+    symbolType === "record_declaration" ||
+    symbolType === "type_declaration" ||
+    symbolType === "function_declaration" ||
+    symbolType === "function_definition";
+
+  if (structuralType) {
+    bonus += 0.12;
+  }
+
+  const implementationDetail =
+    symbolType === "method_declaration" ||
+    symbolType === "method_definition" ||
+    symbolType === "constructor_declaration";
+
+  if (implementationDetail) {
+    bonus -= 0.04;
+  }
+}
 
     /*
  * ---------------------------------------------------------
@@ -325,7 +350,31 @@ if (
     };
   });
 
-  return reranked
-    .sort((a, b) => b.score - a.score)
-    .slice(0, limit);
+  const sortedResults = reranked
+  .sort((a, b) => b.score - a.score);
+
+const selected: SearchResult[] = [];
+const seenSymbols = new Set<string>();
+
+for (const result of sortedResults) {
+  const symbolKey = [
+    result.payload.filePath,
+    result.payload.symbolName ?? "",
+    result.payload.startLine,
+    result.payload.endLine,
+  ].join(":");
+
+  if (seenSymbols.has(symbolKey)) {
+    continue;
+  }
+
+  seenSymbols.add(symbolKey);
+  selected.push(result);
+
+  if (selected.length >= limit) {
+    break;
+  }
+}
+
+return selected;
 }

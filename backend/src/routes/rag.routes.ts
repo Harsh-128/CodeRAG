@@ -104,7 +104,7 @@ export async function ragRoutes(app: FastifyInstance) {
        */
       const broadRepositoryQuestion =
   /\b(repository|codebase|project|components|architecture|structure|flow|overview)\b/i.test(
-    question
+    question  
   );
 
 const searchLimit = broadRepositoryQuestion ? 10 : 5;
@@ -113,7 +113,8 @@ const results = await hybridSearchCode(
   question,
   searchLimit,
   repositoryName,
-  language
+  language,
+  broadRepositoryQuestion
 );
 
       /*

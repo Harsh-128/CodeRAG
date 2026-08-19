@@ -69,7 +69,8 @@ export async function hybridSearchCode(
   query: string,
   limit = 5,
   repositoryName?: string,
-  language?: string
+  language?: string,
+  broadRepositoryQuestion = false
 ): Promise<SearchResult[]> {
   // First get a larger semantic candidate set.
     const semanticResults = await searchCode(
@@ -119,6 +120,7 @@ export async function hybridSearchCode(
   return rerankResults(
   query,
   rankedResults,
-  limit
+  limit,
+  broadRepositoryQuestion
 );
 }
