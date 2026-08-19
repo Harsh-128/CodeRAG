@@ -288,14 +288,73 @@ async function findSymbolUsages(
     });
 }
 
-export function isSymbolNavigationQuestion(question: string): boolean {
+export function isSymbolNavigationQuestion(
+  question: string
+): boolean {
   const normalized = question
     .toLowerCase()
-    .replace(/[^a-z0-9_]+/g, " ")
+    .replace(/[^a-z0-9_$]+/g, " ")
     .trim();
 
-  return /\b(where|defined|definition|constructed|constructor|created|located|show|used|usage|usages|referenced|references|reference|called|calls|invoked|invocations|instantiated|instantiation|does|work)\b/
-  .test(normalized);
+  /*
+   * Direct navigation keywords.
+   *
+   * These questions are explicitly asking where a
+   * symbol is defined, used, called, etc.
+   */
+  if (
+    /\b(where|defined|definition|constructed|constructor|created|located|used|usage|usages|referenced|references|reference|called|calls|invoked|invocations|instantiated|instantiation)\b/
+      .test(normalized)
+  ) {
+    return true;
+  }
+
+  /*
+   * "What does X do?" / "How does X work?"
+   *
+   * Only classify these as symbol navigation when
+   * the question actually contains a code symbol and
+   * method/function terminology.
+   *
+   * This prevents repository questions such as:
+   * "How does user data flow through this repository?"
+   * from being treated as symbol navigation.
+   */
+  const explanatoryNavigation =
+    /\b(does|work)\b/.test(normalized) &&
+    /\b(method|function|class)\b/.test(normalized);
+
+  if (explanatoryNavigation) {
+    const identifiers = question.match(
+      /\b[A-Za-z_$][A-Za-z0-9_$]*\b/g
+    );
+
+    const ignoredWords = new Set([
+      "what",
+      "does",
+      "how",
+      "the",
+      "method",
+      "methods",
+      "function",
+      "functions",
+      "class",
+      "work",
+      "do",
+      "this",
+    ]);
+
+    const hasSymbol = identifiers?.some(
+      (identifier) =>
+        !ignoredWords.has(
+          identifier.toLowerCase()
+        )
+    );
+
+    return Boolean(hasSymbol);
+  }
+
+  return false;
 }
 
 export async function lookupSymbolsForQuestion(

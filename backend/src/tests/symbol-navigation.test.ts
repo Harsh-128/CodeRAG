@@ -184,3 +184,11 @@ test("finds UserService instantiation in main", async () => {
     true
   );
 });
+test("does not treat repository-level data flow as symbol navigation", () => {
+  assert.equal(
+    isSymbolNavigationQuestion(
+      "How does user data flow through this repository?"
+    ),
+    false
+  );
+});
