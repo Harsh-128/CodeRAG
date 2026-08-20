@@ -680,9 +680,12 @@ export function isRepositoryInventoryQuestion(
     .trim();
 
   return (
-    /\b(repository|codebase|project)\s+(structure|overview)\b/.test(
-      normalized
-    ) ||
+  /\b(repository|codebase|project)\s+(structure|overview)\b/.test(
+    normalized
+  ) ||
+  /\bwhat\s+is\s+the\s+(structure|overview)\s+of\s+(this\s+)?(repository|codebase|project)\b/.test(
+    normalized
+  ) ||
     /\bwhat\s+(files|symbols|functions|classes)\b/.test(
       normalized
     ) ||
@@ -718,4 +721,34 @@ export function getRepositoryInventoryQuestionType(
   }
 
   return "overview";
+}
+export function buildRepositoryOverview(
+  inventory: RepositorySymbolInventory
+): string {
+  const languageCounts = new Map<string, number>();
+
+  for (const file of inventory.fileInventory) {
+    languageCounts.set(
+      file.language,
+      (languageCounts.get(file.language) ?? 0) + 1
+    );
+  }
+
+  const languageLines = Array.from(
+    languageCounts.entries()
+  )
+    .sort((a, b) => b[1] - a[1])
+    .map(
+      ([language, count]) =>
+        `- ${language}: ${count} files`
+    );
+
+  return [
+    `Repository: ${inventory.repository}`,
+    `Files: ${inventory.files.length}`,
+    `Symbols: ${inventory.symbols.length}`,
+    "",
+    "Languages:",
+    ...languageLines,
+  ].join("\n");
 }

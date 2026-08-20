@@ -8,6 +8,7 @@ import {
   getRepositorySymbolInventory,
   isRepositoryInventoryQuestion,
   getRepositoryInventoryQuestionType,
+  buildRepositoryOverview,
 } from "../services/symbol.service.js";
 
 export async function ragRoutes(app: FastifyInstance) {
@@ -208,9 +209,8 @@ export async function ragRoutes(app: FastifyInstance) {
     ...symbolLines,
   ].join("\n");
 } else {
-  answer = await generateAnswer(
-    question,
-    inventoryContext
+  answer = buildRepositoryOverview(
+    inventory
   );
 }
 
