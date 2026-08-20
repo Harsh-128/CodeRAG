@@ -717,6 +717,14 @@ export function getRepositoryInventoryQuestionType(
   }
 
   if (
+    /\b(directory|directories|folder|folders)\b/.test(
+      normalized
+    )
+  ) {
+    return "directories";
+  }
+
+  if (
     /\b(functions?|methods?|symbols?|classes?)\b/.test(
       normalized
     )
