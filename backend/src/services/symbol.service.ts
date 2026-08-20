@@ -680,6 +680,9 @@ export function isRepositoryInventoryQuestion(
     .trim();
 
     return (
+        /\b(tree|folder\s+structure|directory\s+structure)\b/.test(
+      normalized
+    ) ||
     /\b(repository|codebase|project)\s+(structure|overview)\b/.test(
       normalized
     ) ||
@@ -706,6 +709,7 @@ export type RepositoryInventoryQuestionType =
   | "symbols"
   | "directories"
   | "directory_contents"
+  | "tree"
   | "overview";
 
 export function getRepositoryInventoryQuestionType(
@@ -717,10 +721,18 @@ export function getRepositoryInventoryQuestionType(
     .trim();
 
   if (/\b(files?|file)\b/.test(normalized)) {
-    return "files";
-  }
+  return "files";
+}
 
-  if (
+if (
+  /\b(tree|folder\s+structure|directory\s+structure)\b/.test(
+    normalized
+  )
+) {
+  return "tree";
+}
+
+if (
   /\b(directory|directories|folder|folders)\b/.test(
     normalized
   )
@@ -801,6 +813,91 @@ export function buildRepositoryDirectoryContents(
       );
     })
     .sort();
+}
+export function buildRepositoryTree(
+  inventory: RepositorySymbolInventory
+): string {
+  const root: {
+    directories: Map<string, any>;
+    files: string[];
+  } = {
+    directories: new Map(),
+    files: [],
+  };
+
+  for (const filePath of inventory.files) {
+    const parts = filePath.split("/");
+    let current = root;
+
+    for (let i = 0; i < parts.length - 1; i++) {
+      const directory = parts[i];
+
+      if (!current.directories.has(directory)) {
+        current.directories.set(directory, {
+          directories: new Map(),
+          files: [],
+        });
+      }
+
+      current = current.directories.get(directory);
+    }
+
+    current.files.push(parts[parts.length - 1]);
+  }
+
+  const lines: string[] = [];
+
+  function render(
+    node: {
+      directories: Map<string, any>;
+      files: string[];
+    },
+    prefix: string
+  ) {
+    const directories = Array.from(
+      node.directories.keys()
+    ).sort();
+
+    const files = [...node.files].sort();
+
+    const entries = [
+      ...directories.map((name) => ({
+        name,
+        type: "directory" as const,
+      })),
+      ...files.map((name) => ({
+        name,
+        type: "file" as const,
+      })),
+    ];
+
+    entries.forEach((entry, index) => {
+      const isLast = index === entries.length - 1;
+      const connector = isLast ? "└── " : "├── ";
+
+      lines.push(
+        `${prefix}${connector}${entry.name}${
+          entry.type === "directory" ? "/" : ""
+        }`
+      );
+
+      if (entry.type === "directory") {
+        const child = node.directories.get(
+          entry.name
+        );
+
+        render(
+          child,
+          `${prefix}${isLast ? "    " : "│   "}`
+        );
+      }
+    });
+  }
+
+  lines.push(`${inventory.repository}/`);
+  render(root, "");
+
+  return lines.join("\n");
 }
 
 export function buildRepositoryOverview(

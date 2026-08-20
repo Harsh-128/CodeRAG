@@ -11,6 +11,7 @@ import {
   buildRepositoryDirectories,
   extractRepositoryDirectory,
   buildRepositoryDirectoryContents,
+  buildRepositoryTree,
   buildRepositoryOverview,
 } from "../services/symbol.service.js";
 
@@ -200,6 +201,8 @@ export async function ragRoutes(app: FastifyInstance) {
       (directory) => `- ${directory}`
     ),
   ].join("\n");
+  } else if (inventoryType === "tree") {
+  answer = buildRepositoryTree(inventory);
   } else if (inventoryType === "directory_contents") {
   const directory =
     extractRepositoryDirectory(question);
@@ -255,7 +258,9 @@ export async function ragRoutes(app: FastifyInstance) {
           repository: repositoryName,
           answer,
           sources:
-  inventoryType === "directory_contents"
+  inventoryType === "tree"
+    ? []
+    : inventoryType === "directory_contents"
     ? (extractRepositoryDirectory(question)
         ? buildRepositoryDirectoryContents(
             inventory,
