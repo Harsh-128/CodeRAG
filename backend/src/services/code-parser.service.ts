@@ -64,6 +64,7 @@ function getInterestingTypes(
         "arrow_function",
         "method_definition",
         "class_declaration",
+        "variable_declaration",
       ]);
 
     case "python":
@@ -95,6 +96,20 @@ function getNodeName(
 
   if (nameNode) {
     return nameNode.text;
+  }
+  if (node.type === "variable_declaration") {
+    const declarator =
+      node.namedChildren.find(
+        (child) =>
+          child.type === "variable_declarator"
+      );
+
+    const nameNode =
+      declarator?.childForFieldName("name");
+
+    if (nameNode) {
+      return nameNode.text;
+    }
   }
 
   if (node.type === "type_declaration") {
@@ -544,8 +559,10 @@ export function parseCode(
       parentName;
 
     if (
-      interestingTypes.has(
-        node.type
+      interestingTypes.has(node.type) &&
+      (
+        node.type !== "variable_declaration" ||
+        node.text.includes("require(")
       )
     ) {
       const name =

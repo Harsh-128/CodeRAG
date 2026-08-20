@@ -7,7 +7,8 @@ function createChunkId(
   repositoryName: string,
   filePath: string,
   symbolName: string,
-  index: number
+  startLine: number,
+  partIndex: number
 ): string {
   const safeFileName = filePath.replace(
     /[^a-zA-Z0-9]/g,
@@ -19,7 +20,7 @@ function createChunkId(
     "-"
   );
 
-  return `${repositoryName}-${safeFileName}-${safeSymbolName}-${index}`;
+  return `${repositoryName}-${safeFileName}-${safeSymbolName}-${startLine}-${partIndex}`;
 }
 
 function splitLargeCode(
@@ -67,11 +68,9 @@ export function createCodeChunks(
 ): CodeChunk[] {
   const chunks: CodeChunk[] = [];
 
-  let globalIndex = 0;
-
   for (const node of nodes) {
     const symbolName =
-      node.name ?? `anonymous-${globalIndex}`;
+      node.name ?? `anonymous-${node.startLine}`;
 
     const codeParts = splitLargeCode(
       node.code,
@@ -84,7 +83,8 @@ export function createCodeChunks(
           repositoryName,
           filePath,
           symbolName,
-          globalIndex
+          node.startLine,
+          0
         ),
         repository: repositoryName,
         filePath,
@@ -97,30 +97,33 @@ export function createCodeChunks(
         content: codeParts[0],
       });
 
-      globalIndex++;
       continue;
     }
 
-    for (let partIndex = 0; partIndex < codeParts.length; partIndex++) {
+    for (
+      let partIndex = 0;
+      partIndex < codeParts.length;
+      partIndex++
+    ) {
       chunks.push({
         id: createChunkId(
           repositoryName,
           filePath,
           `${symbolName}-part-${partIndex + 1}`,
-          globalIndex
+          node.startLine,
+          partIndex
         ),
         repository: repositoryName,
         filePath,
         language,
-        symbolName: `${symbolName} (part ${partIndex + 1}/${codeParts.length})`,
-parentName: node.parentName,
-symbolType: node.type,
+        symbolName:
+          `${symbolName} (part ${partIndex + 1}/${codeParts.length})`,
+        parentName: node.parentName,
+        symbolType: node.type,
         startLine: node.startLine,
         endLine: node.endLine,
         content: codeParts[partIndex],
       });
-
-      globalIndex++;
     }
   }
 

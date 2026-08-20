@@ -85,6 +85,78 @@ export async function ragRoutes(app: FastifyInstance) {
        * 2. Symbol/navigation path
        */
       if (symbolResults.length > 0) {
+        const fileScopedSymbolQuestion =
+          /\b(?:inside|within|in)\s+[A-Za-z0-9_./-]+\.[A-Za-z0-9]+\b/i.test(
+            question
+          ) &&
+          /\b(functions?|methods?|symbols?|classes?)\b/i.test(
+            question
+          );
+
+        if (fileScopedSymbolQuestion) {
+          const filteredSymbolResults =
+            /\b(functions?)\b/i.test(question)
+            ? symbolResults.filter((result) =>
+                [
+                  "function_declaration",
+                  "function",
+                  "arrow_function",
+                  "function_definition",
+                  "method_definition",
+                  "method_declaration",
+                ].includes(
+                  result.payload.symbolType
+                )
+              )
+            : /\b(classes?)\b/i.test(question)
+              ? symbolResults.filter((result) =>
+                  [
+                    "class_declaration",
+                    "class_definition",
+                  ].includes(
+                    result.payload.symbolType
+                  )
+                )
+              : symbolResults;
+          const label = /\bclass(es)?\b/i.test(question)
+            ? "Classes"
+            : /\b(methods?)\b/i.test(question)
+              ? "Methods"
+              : /\b(functions?)\b/i.test(question)
+                ? "Functions"
+                : "Symbols";
+
+          const answer = [
+            `${label} in the requested file:`,
+            ...filteredSymbolResults.map((result) => {
+              const payload = result.payload;
+
+              return `- ${payload.symbolName ?? "anonymous"} — ${payload.startLine}-${payload.endLine}`;
+            }),
+          ].join("\n");
+
+      const sources = filteredSymbolResults
+        .slice(0, 10)
+        .map((result) => ({
+            file: result.payload.filePath,
+            symbol: result.payload.symbolName ?? null,
+            parent: result.payload.parentName ?? null,
+            language: result.payload.language,
+            startLine: result.payload.startLine,
+            endLine: result.payload.endLine,
+            usageLine: result.payload.usageLine ?? null,
+            usageContent:
+                result.payload.usageContent ?? null,
+          }));
+
+          return {
+            question,
+            repository: repositoryName ?? null,
+            answer,
+            sources,
+            mode: "symbol-navigation",
+          };
+        }
         const context = symbolResults
           .slice(0, 10)
           .map((result, index) => {

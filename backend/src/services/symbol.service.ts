@@ -13,6 +13,7 @@ export interface SymbolSearchResult {
   payload: VectorPayload & {
     chunkId?: string;
     usageLine?: number;
+    usageContent?: string;
   };
 }
 
@@ -186,18 +187,36 @@ async function findSymbolUsages(
     });
   }
 
+const points: SymbolSearchResult[] = [];
+
+let offset: Awaited<
+  ReturnType<typeof qdrant.scroll>
+>["next_page_offset"] = null;
+
+do {
   const response = await qdrant.scroll(
     COLLECTION_NAME,
     {
       limit: 100,
+      offset: offset ?? undefined,
       with_payload: true,
       with_vector: false,
       filter: {
         must,
       },
-    },
+    }
   );
 
+  points.push(
+    ...response.points.map((point) => ({
+      id: point.id,
+      payload:
+        point.payload as SymbolSearchResult["payload"],
+    }))
+  );
+
+  offset = response.next_page_offset;
+} while (offset !== null);
   const escaped = symbolName.replace(
     /[.*+?^${}()|[\]\\]/g,
     "\\$&"
@@ -224,13 +243,7 @@ async function findSymbolUsages(
   const normalizedTarget =
     symbolName.toLowerCase();
 
-  return response.points
-    .map((point) => ({
-      id: point.id,
-      payload:
-        point.payload as SymbolSearchResult["payload"],
-    }))
-    .filter((result) => {
+  return points.filter((result) => {
       const payload = result.payload;
 
       if (!payload.content) {
@@ -283,6 +296,11 @@ async function findSymbolUsages(
 
       payload.usageLine =
         payload.startLine + relativeLine;
+        const matchedLine =
+  payload.content.split("\n")[relativeLine];
+
+payload.usageContent =
+  matchedLine?.trim() ?? symbolName;
 
       return true;
     });
@@ -383,6 +401,28 @@ export async function lookupSymbolsForQuestion(
       parentMatch[1],
       repositoryName,
       language
+    );
+  }
+    /*
+   * Questions asking what symbols/functions/classes
+   * are inside a specific file should search by filePath.
+   *
+   * Example:
+   *   What functions are inside lib/application.js?
+   */
+  const fileMatch = question.match(
+    /\b(?:inside|within|in)\s+([A-Za-z0-9_./-]+\.[A-Za-z0-9]+)\b/i
+  );
+
+  if (
+    fileMatch &&
+    /\b(functions?|methods?|symbols?|classes?)\b/i.test(
+      question
+    )
+  ) {
+    return findSymbolsByFile(
+      fileMatch[1],
+      repositoryName
     );
   }
 
@@ -548,15 +588,19 @@ export async function getRepositorySymbolInventory(
     RepositorySymbolInventory["fileInventory"][number]
   >();
 
-  let offset: Awaited<ReturnType<typeof qdrant.scroll>>["next_page_offset"] = null;
+  let offset: Awaited<
+    ReturnType<typeof qdrant.scroll>
+  >["next_page_offset"] = null;
 
   do {
-    const response = await qdrant.scroll(COLLECTION_NAME, {
-      limit: 1000,
-      offset: offset ?? undefined,
-      with_payload: true,
-      with_vector: false,
-      filter: {
+      const response = await qdrant.scroll(
+        COLLECTION_NAME,
+      {
+        limit: 1000,
+        offset: offset ?? undefined,
+        with_payload: true,
+        with_vector: false,
+        filter: {
         must: [
           {
             key: "repository",
