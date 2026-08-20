@@ -680,29 +680,32 @@ export function isRepositoryInventoryQuestion(
     .trim();
 
     return (
-        /\b(tree|folder\s+structure|directory\s+structure)\b/.test(
-      normalized
-    ) ||
-    /\b(repository|codebase|project)\s+(structure|overview)\b/.test(
-      normalized
-    ) ||
-    /\bwhat\s+is\s+the\s+(structure|overview)\s+of\s+(this\s+)?(repository|codebase|project)\b/.test(
-      normalized
-    ) ||
-    /\bwhat\s+(files|symbols|functions|classes)\b/.test(
-      normalized
-    ) ||
-    /\b(project|repository|codebase)\s+files\b/.test(
-      normalized
-    ) ||
-    /\b(what\s+)?(directories|directory|folders|folder)\b/.test(
-      normalized
-    ) ||
-    /\b(inside|within)\s+[a-z0-9_-]+\b/.test(
-      normalized
-    ) ||
-    /\bcomponents\b/.test(normalized)
-  );
+  /\b(main\s+modules?|main\s+directories?|module\s+overview)\b/.test(
+    normalized
+  ) ||
+  /\b(tree|folder\s+structure|directory\s+structure)\b/.test(
+    normalized
+  ) ||
+  /\b(repository|codebase|project)\s+(structure|overview)\b/.test(
+    normalized
+  ) ||
+  /\bwhat\s+is\s+the\s+(structure|overview)\s+of\s+(this\s+)?(repository|codebase|project)\b/.test(
+    normalized
+  ) ||
+  /\bwhat\s+(files|symbols|functions|classes)\b/.test(
+    normalized
+  ) ||
+  /\b(project|repository|codebase)\s+files\b/.test(
+    normalized
+  ) ||
+  /\b(what\s+)?(directories|directory|folders|folder)\b/.test(
+    normalized
+  ) ||
+  /\b(inside|within)\s+[a-z0-9_-]+\b/.test(
+    normalized
+  ) ||
+  /\bcomponents\b/.test(normalized)
+);
 }
 export type RepositoryInventoryQuestionType =
   | "files"
@@ -710,6 +713,7 @@ export type RepositoryInventoryQuestionType =
   | "directories"
   | "directory_contents"
   | "tree"
+  | "module_overview"
   | "overview";
 
 export function getRepositoryInventoryQuestionType(
@@ -722,6 +726,13 @@ export function getRepositoryInventoryQuestionType(
 
   if (/\b(files?|file)\b/.test(normalized)) {
   return "files";
+}
+if (
+  /\b(main\s+modules?|main\s+directories?|module\s+overview)\b/.test(
+    normalized
+  )
+) {
+  return "module_overview";
 }
 
 if (
@@ -896,6 +907,47 @@ export function buildRepositoryTree(
 
   lines.push(`${inventory.repository}/`);
   render(root, "");
+
+  return lines.join("\n");
+}
+export function buildRepositoryModuleOverview(
+  inventory: RepositorySymbolInventory
+): string {
+  const directories = buildRepositoryDirectories(
+    inventory
+  );
+
+  const topLevelDirectories = directories.filter(
+    (directory) => !directory.includes("/")
+  );
+
+  const lines = [
+    `Repository: ${inventory.repository}`,
+    "",
+    "Main modules/directories:",
+  ];
+
+  for (const directory of topLevelDirectories) {
+    const prefix = `${directory}/`;
+
+    const files = inventory.files.filter(
+      (filePath) =>
+        filePath.startsWith(prefix) &&
+        !filePath
+          .slice(prefix.length)
+          .includes("/")
+    );
+
+    const childDirectories = directories.filter(
+      (child) =>
+        child.startsWith(prefix) &&
+        !child.slice(prefix.length).includes("/")
+    );
+
+    lines.push(
+      `- ${directory}/ — ${files.length} files, ${childDirectories.length} subdirectories`
+    );
+  }
 
   return lines.join("\n");
 }
