@@ -8,6 +8,7 @@ import {
   getRepositorySymbolInventory,
   isRepositoryInventoryQuestion,
   getRepositoryInventoryQuestionType,
+  buildRepositoryDirectories,
   buildRepositoryOverview,
 } from "../services/symbol.service.js";
 
@@ -181,13 +182,23 @@ export async function ragRoutes(app: FastifyInstance) {
         let answer: string;
 
         if (inventoryType === "files") {
-        answer = [
-        `The repository contains ${inventory.files.length} files:`,
-        ...inventory.files.map(
-        (file) => `- ${file}`
-          ),
-          ].join("\n");
-          } else if (inventoryType === "symbols") {
+  answer = [
+    `The repository contains ${inventory.files.length} files:`,
+    ...inventory.files.map(
+      (file) => `- ${file}`
+    ),
+  ].join("\n");
+} else if (inventoryType === "directories") {
+  const directories =
+    buildRepositoryDirectories(inventory);
+
+  answer = [
+    `The repository contains ${directories.length} directories:`,
+    ...directories.map(
+      (directory) => `- ${directory}`
+    ),
+  ].join("\n");
+} else if (inventoryType === "symbols") {
           const symbolLines = inventory.fileInventory.flatMap(
       (file) =>
         file.symbols.map((symbol) => {

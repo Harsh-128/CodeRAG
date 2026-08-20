@@ -689,7 +689,10 @@ export function isRepositoryInventoryQuestion(
     /\bwhat\s+(files|symbols|functions|classes)\b/.test(
       normalized
     ) ||
-    /\b(project|repository|codebase)\s+files\b/.test(
+        /\b(project|repository|codebase)\s+files\b/.test(
+      normalized
+    ) ||
+    /\b(what\s+)?(directories|directory|folders|folder)\b/.test(
       normalized
     ) ||
     /\bcomponents\b/.test(normalized)
@@ -698,6 +701,7 @@ export function isRepositoryInventoryQuestion(
 export type RepositoryInventoryQuestionType =
   | "files"
   | "symbols"
+  | "directories"
   | "overview";
 
 export function getRepositoryInventoryQuestionType(
@@ -722,6 +726,26 @@ export function getRepositoryInventoryQuestionType(
 
   return "overview";
 }
+export function buildRepositoryDirectories(
+  inventory: RepositorySymbolInventory
+): string[] {
+  const directories = new Set<string>();
+
+  for (const filePath of inventory.files) {
+    const parts = filePath.split("/");
+
+    if (parts.length <= 1) {
+      continue;
+    }
+
+    for (let i = 1; i < parts.length; i++) {
+      directories.add(parts.slice(0, i).join("/"));
+    }
+  }
+
+  return Array.from(directories).sort();
+}
+
 export function buildRepositoryOverview(
   inventory: RepositorySymbolInventory
 ): string {
