@@ -9,6 +9,8 @@ import {
   isRepositoryInventoryQuestion,
   getRepositoryInventoryQuestionType,
   buildRepositoryDirectories,
+  extractRepositoryDirectory,
+  buildRepositoryDirectoryContents,
   buildRepositoryOverview,
 } from "../services/symbol.service.js";
 
@@ -198,6 +200,29 @@ export async function ragRoutes(app: FastifyInstance) {
       (directory) => `- ${directory}`
     ),
   ].join("\n");
+  } else if (inventoryType === "directory_contents") {
+  const directory =
+    extractRepositoryDirectory(question);
+
+  if (!directory) {
+    answer = "I could not determine the directory.";
+  } else {
+    const files =
+      buildRepositoryDirectoryContents(
+        inventory,
+        directory
+      );
+
+    answer =
+      files.length === 0
+        ? `No files found directly inside ${directory}.`
+        : [
+            `Files inside ${directory}:`,
+            ...files.map(
+              (file) => `- ${file}`
+            ),
+          ].join("\n");
+  }
 } else if (inventoryType === "symbols") {
           const symbolLines = inventory.fileInventory.flatMap(
       (file) =>
@@ -229,16 +254,37 @@ export async function ragRoutes(app: FastifyInstance) {
           question,
           repository: repositoryName,
           answer,
-          sources: inventory.symbols
-            .slice(0, 5)
-            .map((symbol) => ({
-              file: symbol.filePath,
-              symbol: symbol.name,
-              parent: symbol.parentName ?? null,
-              language: symbol.language,
-              startLine: symbol.startLine,
-              endLine: symbol.endLine,
-            })),
+          sources:
+  inventoryType === "directory_contents"
+    ? (extractRepositoryDirectory(question)
+        ? buildRepositoryDirectoryContents(
+            inventory,
+            extractRepositoryDirectory(question)!
+          )
+        : []
+      )
+        .slice(0, 5)
+        .map((filePath) => ({
+          file: filePath,
+          symbol: null,
+          parent: null,
+          language:
+            inventory.fileInventory.find(
+              (file) => file.filePath === filePath
+            )?.language ?? null,
+          startLine: null,
+          endLine: null,
+        }))
+    : inventory.symbols
+        .slice(0, 5)
+        .map((symbol) => ({
+          file: symbol.filePath,
+          symbol: symbol.name,
+          parent: symbol.parentName ?? null,
+          language: symbol.language,
+          startLine: symbol.startLine,
+          endLine: symbol.endLine,
+        })),
           mode: "repository-inventory",
         };
       }

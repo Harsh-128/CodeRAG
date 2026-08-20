@@ -679,20 +679,23 @@ export function isRepositoryInventoryQuestion(
     .replace(/[^a-z0-9_$]+/g, " ")
     .trim();
 
-  return (
-  /\b(repository|codebase|project)\s+(structure|overview)\b/.test(
-    normalized
-  ) ||
-  /\bwhat\s+is\s+the\s+(structure|overview)\s+of\s+(this\s+)?(repository|codebase|project)\b/.test(
-    normalized
-  ) ||
+    return (
+    /\b(repository|codebase|project)\s+(structure|overview)\b/.test(
+      normalized
+    ) ||
+    /\bwhat\s+is\s+the\s+(structure|overview)\s+of\s+(this\s+)?(repository|codebase|project)\b/.test(
+      normalized
+    ) ||
     /\bwhat\s+(files|symbols|functions|classes)\b/.test(
       normalized
     ) ||
-        /\b(project|repository|codebase)\s+files\b/.test(
+    /\b(project|repository|codebase)\s+files\b/.test(
       normalized
     ) ||
     /\b(what\s+)?(directories|directory|folders|folder)\b/.test(
+      normalized
+    ) ||
+    /\b(inside|within)\s+[a-z0-9_-]+\b/.test(
       normalized
     ) ||
     /\bcomponents\b/.test(normalized)
@@ -702,6 +705,7 @@ export type RepositoryInventoryQuestionType =
   | "files"
   | "symbols"
   | "directories"
+  | "directory_contents"
   | "overview";
 
 export function getRepositoryInventoryQuestionType(
@@ -717,22 +721,44 @@ export function getRepositoryInventoryQuestionType(
   }
 
   if (
-    /\b(directory|directories|folder|folders)\b/.test(
-      normalized
-    )
-  ) {
-    return "directories";
-  }
+  /\b(directory|directories|folder|folders)\b/.test(
+    normalized
+  )
+) {
+  return "directories";
+}
 
-  if (
-    /\b(functions?|methods?|symbols?|classes?)\b/.test(
-      normalized
-    )
-  ) {
-    return "symbols";
-  }
+if (
+  /\b(inside|within)\s+[a-z0-9_./-]+/.test(
+    normalized
+  )
+) {
+  return "directory_contents";
+}
+
+if (
+  /\b(functions?|methods?|symbols?|classes?)\b/.test(
+    normalized
+  )
+) {
+  return "symbols";
+}
 
   return "overview";
+}
+export function extractRepositoryDirectory(
+  question: string
+): string | null {
+  const normalized = question
+    .toLowerCase()
+    .replace(/[^a-z0-9_./-]+/g, " ")
+    .trim();
+
+  const match = normalized.match(
+    /\b(?:inside|within)\s+([a-z0-9_./-]+)/
+  );
+
+  return match?.[1] ?? null;
 }
 export function buildRepositoryDirectories(
   inventory: RepositorySymbolInventory
@@ -752,6 +778,29 @@ export function buildRepositoryDirectories(
   }
 
   return Array.from(directories).sort();
+}
+export function buildRepositoryDirectoryContents(
+  inventory: RepositorySymbolInventory,
+  directory: string
+): string[] {
+  const normalizedDirectory = directory
+    .replace(/^\/+|\/+$/g, "")
+    .toLowerCase();
+
+  const prefix = `${normalizedDirectory}/`;
+
+  return inventory.files
+    .filter((filePath) => {
+      const normalizedFilePath = filePath.toLowerCase();
+
+      return (
+        normalizedFilePath.startsWith(prefix) &&
+        !normalizedFilePath
+          .slice(prefix.length)
+          .includes("/")
+      );
+    })
+    .sort();
 }
 
 export function buildRepositoryOverview(
