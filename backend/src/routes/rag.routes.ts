@@ -18,31 +18,29 @@ import {
 
 export async function ragRoutes(app: FastifyInstance) {
   app.get(
-  "/api/repository/:repositoryName/inventory",
-  async (request, reply) => {
-    const { repositoryName } = request.params as {
-      repositoryName?: string;
-    };
+    "/api/repository/:repositoryName/inventory",
+    async (request, reply) => {
+      const { repositoryName } = request.params as {
+        repositoryName?: string;
+      };
 
-    if (!repositoryName || !repositoryName.trim()) {
-      return reply.status(400).send({
-        error: "repositoryName is required",
-      });
-    }
+      if (!repositoryName || !repositoryName.trim()) {
+        return reply.status(400).send({
+          error: "repositoryName is required",
+        });
+      }
 
-    try {
-      return await getRepositorySymbolInventory(
-        repositoryName.trim()
-      );
-    } catch (error) {
-      app.log.error(error);
+      try {
+        return await getRepositorySymbolInventory(repositoryName.trim());
+      } catch (error) {
+        app.log.error(error);
 
-      return reply.status(500).send({
-        error: "Failed to build repository symbol inventory",
-      });
-    }
-  }
-);
+        return reply.status(500).send({
+          error: "Failed to build repository symbol inventory",
+        });
+      }
+    },
+  );
   app.post("/api/ask", async (request, reply) => {
     const body = request.body as {
       question?: string;
@@ -67,12 +65,9 @@ export async function ragRoutes(app: FastifyInstance) {
       const symbolResults = await lookupSymbolsForQuestion(
         question,
         repositoryName,
-        language
+        language,
       );
-      if (
-        isSymbolNavigationQuestion(question) &&
-        symbolResults.length === 0
-      ) {
+      if (isSymbolNavigationQuestion(question) && symbolResults.length === 0) {
         return {
           question,
           repository: repositoryName ?? null,
@@ -87,15 +82,11 @@ export async function ragRoutes(app: FastifyInstance) {
       if (symbolResults.length > 0) {
         const fileScopedSymbolQuestion =
           /\b(?:inside|within|in)\s+[A-Za-z0-9_./-]+\.[A-Za-z0-9]+\b/i.test(
-            question
-          ) &&
-          /\b(functions?|methods?|symbols?|classes?)\b/i.test(
-            question
-          );
+            question,
+          ) && /\b(functions?|methods?|symbols?|classes?)\b/i.test(question);
 
         if (fileScopedSymbolQuestion) {
-          const filteredSymbolResults =
-            /\b(functions?)\b/i.test(question)
+          const filteredSymbolResults = /\b(functions?)\b/i.test(question)
             ? symbolResults.filter((result) =>
                 [
                   "function_declaration",
@@ -104,18 +95,13 @@ export async function ragRoutes(app: FastifyInstance) {
                   "function_definition",
                   "method_definition",
                   "method_declaration",
-                ].includes(
-                  result.payload.symbolType
-                )
+                ].includes(result.payload.symbolType),
               )
             : /\b(classes?)\b/i.test(question)
               ? symbolResults.filter((result) =>
-                  [
-                    "class_declaration",
-                    "class_definition",
-                  ].includes(
-                    result.payload.symbolType
-                  )
+                  ["class_declaration", "class_definition"].includes(
+                    result.payload.symbolType,
+                  ),
                 )
               : symbolResults;
           const label = /\bclass(es)?\b/i.test(question)
@@ -135,9 +121,7 @@ export async function ragRoutes(app: FastifyInstance) {
             }),
           ].join("\n");
 
-      const sources = filteredSymbolResults
-        .slice(0, 10)
-        .map((result) => ({
+          const sources = filteredSymbolResults.slice(0, 10).map((result) => ({
             file: result.payload.filePath,
             symbol: result.payload.symbolName ?? null,
             parent: result.payload.parentName ?? null,
@@ -145,8 +129,7 @@ export async function ragRoutes(app: FastifyInstance) {
             startLine: result.payload.startLine,
             endLine: result.payload.endLine,
             usageLine: result.payload.usageLine ?? null,
-            usageContent:
-                result.payload.usageContent ?? null,
+            usageContent: result.payload.usageContent ?? null,
           }));
 
           return {
@@ -181,44 +164,47 @@ export async function ragRoutes(app: FastifyInstance) {
           .join("\n\n");
 
         const requestedSymbol =
+          question.match(/`([A-Za-z_$][A-Za-z0-9_$]*)`/)?.[1] ??
           question.match(
-            /`([A-Za-z_$][A-Za-z0-9_$]*)`/
+            /\b(?:where\s+is|where\s+are|find|locate)\s+([A-Za-z_$][A-Za-z0-9_$]*)\b/i,
           )?.[1] ??
           question.match(
-            /\b(?:where\s+is|where\s+are|find|locate)\s+([A-Za-z_$][A-Za-z0-9_$]*)\b/i
+            /(?:belong\s+to|of)\s+([A-Za-z_$][A-Za-z0-9_$]*)/i,
           )?.[1] ??
           "symbol";
 
+        const isParentMethodQuestion =
+          /\b(?:methods?|functions?)\s+(?:belong\s+to|of)\b/i.test(question);
+
         const answer = [
-          `The \`${requestedSymbol}\` is used in:`,
+          isParentMethodQuestion
+            ? `Methods belonging to \`${requestedSymbol}\`:`
+            : `The \`${requestedSymbol}\` is used in:`,
           ...symbolResults.slice(0, 10).map((result) => {
             const payload = result.payload;
 
-            const location =
-              `${payload.filePath}:${payload.usageLine ?? payload.startLine}`;
+            if (payload.usageContent) {
+              const usageLocation = `${payload.filePath}:${payload.usageLine ?? payload.startLine}`;
 
-            const usage =
-              payload.usageContent
-                ? ` — ${payload.usageContent}`
-                : "";
+              return `- ${usageLocation} — ${payload.usageContent}`;
+            }
 
-            return `- ${location}${usage}`;
+            const location = `${payload.filePath}:${payload.startLine}-${payload.endLine}`;
+
+            return `- ${payload.symbolName ?? "anonymous"} — ${location}`;
           }),
         ].join("\n");
 
-        const sources = symbolResults
-          .slice(0, 5)
-          .map((result) => ({
-            file: result.payload.filePath,
-            symbol: result.payload.symbolName ?? null,
-            parent: result.payload.parentName ?? null,
-            language: result.payload.language,
-            startLine: result.payload.startLine,
-            endLine: result.payload.endLine,
-            usageLine: result.payload.usageLine ?? null,
-            usageContent:
-              result.payload.usageContent ?? null,
-          }));
+        const sources = symbolResults.slice(0, 5).map((result) => ({
+          file: result.payload.filePath,
+          symbol: result.payload.symbolName ?? null,
+          parent: result.payload.parentName ?? null,
+          language: result.payload.language,
+          startLine: result.payload.startLine,
+          endLine: result.payload.endLine,
+          usageLine: result.payload.usageLine ?? null,
+          usageContent: result.payload.usageContent ?? null,
+        }));
 
         return {
           question,
@@ -237,12 +223,8 @@ export async function ragRoutes(app: FastifyInstance) {
         !language &&
         isRepositoryInventoryQuestion(question)
       ) {
-        const inventory =
-          await getRepositorySymbolInventory(
-            repositoryName
-          );
-        const inventoryType =
-          getRepositoryInventoryQuestionType(question);
+        const inventory = await getRepositorySymbolInventory(repositoryName);
+        const inventoryType = getRepositoryInventoryQuestionType(question);
 
         const inventoryContext = [
           "--- Repository Inventory ---",
@@ -254,10 +236,9 @@ export async function ragRoutes(app: FastifyInstance) {
                 ? "  (no extracted symbols)"
                 : file.symbols
                     .map((symbol) => {
-                      const parent =
-                        symbol.parentName
-                          ? ` | parent: ${symbol.parentName}`
-                          : "";
+                      const parent = symbol.parentName
+                        ? ` | parent: ${symbol.parentName}`
+                        : "";
 
                       return [
                         `  - ${symbol.name}`,
@@ -268,10 +249,9 @@ export async function ragRoutes(app: FastifyInstance) {
                     })
                     .join("\n");
 
-            return [
-              `- ${file.filePath} (${file.language})`,
-              symbols,
-            ].join("\n");
+            return [`- ${file.filePath} (${file.language})`, symbols].join(
+              "\n",
+            );
           }),
           "",
           `Total symbols: ${inventory.symbols.length}`,
@@ -281,114 +261,99 @@ export async function ragRoutes(app: FastifyInstance) {
         let answer: string;
 
         if (inventoryType === "files") {
-  answer = [
-    `The repository contains ${inventory.files.length} files:`,
-    ...inventory.files.map(
-      (file) => `- ${file}`
-    ),
-  ].join("\n");
-} else if (inventoryType === "directories") {
-  const directories =
-    buildRepositoryDirectories(inventory);
-
-  answer = [
-    `The repository contains ${directories.length} directories:`,
-    ...directories.map(
-      (directory) => `- ${directory}`
-    ),
-  ].join("\n");
-  } else if (inventoryType === "tree") {
-  answer = buildRepositoryTree(inventory);
-} else if (inventoryType === "module_overview") {
-  answer = buildRepositoryModuleOverview(inventory);
-} else if (inventoryType === "directory_contents") {
-  const directory =
-    extractRepositoryDirectory(question);
-
-  if (!directory) {
-    answer = "I could not determine the directory.";
-  } else {
-    const files =
-      buildRepositoryDirectoryContents(
-        inventory,
-        directory
-      );
-
-    answer =
-      files.length === 0
-        ? `No files found directly inside ${directory}.`
-        : [
-            `Files inside ${directory}:`,
-            ...files.map(
-              (file) => `- ${file}`
-            ),
+          answer = [
+            `The repository contains ${inventory.files.length} files:`,
+            ...inventory.files.map((file) => `- ${file}`),
           ].join("\n");
-  }
-} else if (inventoryType === "symbols") {
-          const symbolLines = inventory.fileInventory.flatMap(
-      (file) =>
-        file.symbols.map((symbol) => {
-          const parent = symbol.parentName
-            ? ` | parent: ${symbol.parentName}`
-            : "";
+        } else if (inventoryType === "directories") {
+          const directories = buildRepositoryDirectories(inventory);
 
-          return [
-            `- ${symbol.name}`,
-            `(${symbol.type})`,
-            `— ${file.filePath}:${symbol.startLine}-${symbol.endLine}`,
-            parent,
-          ].join(" ");
-        })
-    );
+          answer = [
+            `The repository contains ${directories.length} directories:`,
+            ...directories.map((directory) => `- ${directory}`),
+          ].join("\n");
+        } else if (inventoryType === "tree") {
+          answer = buildRepositoryTree(inventory);
+        } else if (inventoryType === "module_overview") {
+          answer = buildRepositoryModuleOverview(inventory);
+        } else if (inventoryType === "directory_contents") {
+          const directory = extractRepositoryDirectory(question);
 
-  answer = [
-    `The repository contains ${inventory.symbols.length} symbols across ${inventory.files.length} files:`,
-    ...symbolLines,
-  ].join("\n");
-} else {
-  answer = buildRepositoryOverview(
-    inventory
-  );
-}
+          if (!directory) {
+            answer = "I could not determine the directory.";
+          } else {
+            const files = buildRepositoryDirectoryContents(
+              inventory,
+              directory,
+            );
+
+            answer =
+              files.length === 0
+                ? `No files found directly inside ${directory}.`
+                : [
+                    `Files inside ${directory}:`,
+                    ...files.map((file) => `- ${file}`),
+                  ].join("\n");
+          }
+        } else if (inventoryType === "symbols") {
+          const symbolLines = inventory.fileInventory.flatMap((file) =>
+            file.symbols.map((symbol) => {
+              const parent = symbol.parentName
+                ? ` | parent: ${symbol.parentName}`
+                : "";
+
+              return [
+                `- ${symbol.name}`,
+                `(${symbol.type})`,
+                `— ${file.filePath}:${symbol.startLine}-${symbol.endLine}`,
+                parent,
+              ].join(" ");
+            }),
+          );
+
+          answer = [
+            `The repository contains ${inventory.symbols.length} symbols across ${inventory.files.length} files:`,
+            ...symbolLines,
+          ].join("\n");
+        } else {
+          answer = buildRepositoryOverview(inventory);
+        }
 
         return {
           question,
           repository: repositoryName,
           answer,
           sources:
-  inventoryType === "tree" ||
-  inventoryType === "module_overview"
-    ? []
-    : inventoryType === "directory_contents"
-    ? (extractRepositoryDirectory(question)
-        ? buildRepositoryDirectoryContents(
-            inventory,
-            extractRepositoryDirectory(question)!
-          )
-        : []
-      )
-        .slice(0, 5)
-        .map((filePath) => ({
-          file: filePath,
-          symbol: null,
-          parent: null,
-          language:
-            inventory.fileInventory.find(
-              (file) => file.filePath === filePath
-            )?.language ?? null,
-          startLine: null,
-          endLine: null,
-        }))
-    : inventory.symbols
-        .slice(0, 5)
-        .map((symbol) => ({
-          file: symbol.filePath,
-          symbol: symbol.name,
-          parent: symbol.parentName ?? null,
-          language: symbol.language,
-          startLine: symbol.startLine,
-          endLine: symbol.endLine,
-        })),
+            inventoryType === "tree" || inventoryType === "module_overview"
+              ? []
+              : inventoryType === "directory_contents"
+                ? (extractRepositoryDirectory(question)
+                    ? buildRepositoryDirectoryContents(
+                        inventory,
+                        extractRepositoryDirectory(question)!,
+                      )
+                    : []
+                  )
+                    .slice(0, 5)
+                    .map((filePath) => ({
+                      file: filePath,
+                      symbol: null,
+                      parent: null,
+                      language:
+                        inventory.fileInventory.find(
+                          (file) => file.filePath === filePath,
+                        )?.language ?? null,
+                      startLine: null,
+                      endLine: null,
+                    }))
+                : inventory.symbols.slice(0, 5).map((symbol) => ({
+                    file: symbol.filePath,
+                    symbol: symbol.name,
+                    parent: symbol.parentName ?? null,
+                    language: symbol.language,
+                    startLine: symbol.startLine,
+                    endLine: symbol.endLine,
+                  })),
           mode: "repository-inventory",
         };
       }
@@ -397,46 +362,38 @@ export async function ragRoutes(app: FastifyInstance) {
        * 4. Normal semantic + lexical RAG path
        */
       const broadRepositoryQuestion =
-  /\b(repository|codebase|project|components|architecture|structure|flow|overview)\b/i.test(
-    question  
-  );
+        /\b(repository|codebase|project|components|architecture|structure|flow|overview)\b/i.test(
+          question,
+        );
 
-const searchLimit = broadRepositoryQuestion ? 10 : 5;
+      const searchLimit = broadRepositoryQuestion ? 10 : 5;
 
-const results = await hybridSearchCode(
-  question,
-  searchLimit,
-  repositoryName,
-  language,
-  broadRepositoryQuestion
-);
+      const results = await hybridSearchCode(
+        question,
+        searchLimit,
+        repositoryName,
+        language,
+        broadRepositoryQuestion,
+      );
 
       /*
        * 4. Build focused context
        */
-      const context = buildContext(
-  results,
-  broadRepositoryQuestion
-);
+      const context = buildContext(results, broadRepositoryQuestion);
 
       /*
        * 5. Generate grounded answer
        */
-      const answer = await generateAnswer(
-        question,
-        context
-      );
+      const answer = await generateAnswer(question, context);
 
       /*
        * 6. Return sources
        */
-      const sourceThreshold = broadRepositoryQuestion
-  ? 0.45
-  : 0.70;
+      const sourceThreshold = broadRepositoryQuestion ? 0.45 : 0.7;
 
-const sources = results
-  .filter((result) => result.score >= sourceThreshold)
-  .slice(0, 3)
+      const sources = results
+        .filter((result) => result.score >= sourceThreshold)
+        .slice(0, 3)
         .map((result) => ({
           file: result.payload.filePath,
           symbol: result.payload.symbolName ?? null,

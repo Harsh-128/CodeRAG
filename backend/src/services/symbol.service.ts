@@ -1,8 +1,5 @@
 import { QdrantClient } from "@qdrant/js-client-rest";
-import {
-  COLLECTION_NAME,
-  VectorPayload,
-} from "./vector.service.js";
+import { COLLECTION_NAME, VectorPayload } from "./vector.service.js";
 
 const qdrant = new QdrantClient({
   url: "http://localhost:6333",
@@ -21,7 +18,7 @@ export async function findSymbol(
   symbolName: string,
   repositoryName?: string,
   language?: string,
-  limit = 10
+  limit = 10,
 ): Promise<SymbolSearchResult[]> {
   const must: Array<Record<string, unknown>> = [];
 
@@ -43,17 +40,14 @@ export async function findSymbol(
     });
   }
 
-  const response = await qdrant.scroll(
-    COLLECTION_NAME,
-    {
-      limit: 1000,
-      with_payload: true,
-      with_vector: false,
-      filter: {
-        must,
-      },
-    }
-  );
+  const response = await qdrant.scroll(COLLECTION_NAME, {
+    limit: 1000,
+    with_payload: true,
+    with_vector: false,
+    filter: {
+      must,
+    },
+  });
 
   const normalizedSymbolName = symbolName.toLowerCase();
 
@@ -64,8 +58,7 @@ export async function findSymbol(
     }))
     .filter(
       (result) =>
-        result.payload.symbolName?.toLowerCase() ===
-        normalizedSymbolName
+        result.payload.symbolName?.toLowerCase() === normalizedSymbolName,
     )
     .slice(0, limit);
 }
@@ -74,7 +67,7 @@ export async function findSymbolsByParent(
   parentName: string,
   repositoryName?: string,
   language?: string,
-  limit = 20
+  limit = 20,
 ): Promise<SymbolSearchResult[]> {
   const must: Array<Record<string, unknown>> = [
     {
@@ -103,28 +96,43 @@ export async function findSymbolsByParent(
     });
   }
 
-  const response = await qdrant.scroll(
-    COLLECTION_NAME,
-    {
-      limit,
-      with_payload: true,
-      with_vector: false,
-      filter: {
-        must,
-      },
-    }
-  );
+  const response = await qdrant.scroll(COLLECTION_NAME, {
+    limit,
+    with_payload: true,
+    with_vector: false,
+    filter: {
+      must,
+    },
+  });
 
-  return response.points.map((point) => ({
-    id: point.id,
-    payload: point.payload as SymbolSearchResult["payload"],
-  }));
+  return response.points
+    .map((point) => ({
+      id: point.id,
+      payload: point.payload as SymbolSearchResult["payload"],
+    }))
+    .sort((a, b) => {
+      const aFile = a.payload.filePath;
+      const bFile = b.payload.filePath;
+
+      const aIsLib = aFile.startsWith("lib/");
+      const bIsLib = bFile.startsWith("lib/");
+
+      if (aIsLib && !bIsLib) {
+        return -1;
+      }
+
+      if (!aIsLib && bIsLib) {
+        return 1;
+      }
+
+      return a.payload.startLine - b.payload.startLine;
+    });
 }
 
 export async function findSymbolsByFile(
   filePath: string,
   repositoryName?: string,
-  limit = 50
+  limit = 50,
 ): Promise<SymbolSearchResult[]> {
   const must: Array<Record<string, unknown>> = [
     {
@@ -144,17 +152,14 @@ export async function findSymbolsByFile(
     });
   }
 
-  const response = await qdrant.scroll(
-    COLLECTION_NAME,
-    {
-      limit,
-      with_payload: true,
-      with_vector: false,
-      filter: {
-        must,
-      },
+  const response = await qdrant.scroll(COLLECTION_NAME, {
+    limit,
+    with_payload: true,
+    with_vector: false,
+    filter: {
+      must,
     },
-  );
+  });
 
   return response.points.map((point) => ({
     id: point.id,
@@ -165,7 +170,7 @@ export async function findSymbolsByFile(
 async function findSymbolUsages(
   symbolName: string,
   repositoryName?: string,
-  language?: string
+  language?: string,
 ): Promise<SymbolSearchResult[]> {
   const must: any[] = [];
 
@@ -187,16 +192,13 @@ async function findSymbolUsages(
     });
   }
 
-const points: SymbolSearchResult[] = [];
+  const points: SymbolSearchResult[] = [];
 
-let offset: Awaited<
-  ReturnType<typeof qdrant.scroll>
->["next_page_offset"] = null;
+  let offset: Awaited<ReturnType<typeof qdrant.scroll>>["next_page_offset"] =
+    null;
 
-do {
-  const response = await qdrant.scroll(
-    COLLECTION_NAME,
-    {
+  do {
+    const response = await qdrant.scroll(COLLECTION_NAME, {
       limit: 100,
       offset: offset ?? undefined,
       with_payload: true,
@@ -204,27 +206,20 @@ do {
       filter: {
         must,
       },
-    }
-  );
+    });
 
-  points.push(
-    ...response.points.map((point) => ({
-      id: point.id,
-      payload:
-        point.payload as SymbolSearchResult["payload"],
-    }))
-  );
+    points.push(
+      ...response.points.map((point) => ({
+        id: point.id,
+        payload: point.payload as SymbolSearchResult["payload"],
+      })),
+    );
 
-  offset = response.next_page_offset;
-} while (offset !== null);
-  const escaped = symbolName.replace(
-    /[.*+?^${}()|[\]\\]/g,
-    "\\$&"
-  );
+    offset = response.next_page_offset;
+  } while (offset !== null);
+  const escaped = symbolName.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
 
-  const usageRegex = new RegExp(
-    `\\b${escaped}\\b`
-  );
+  const usageRegex = new RegExp(`\\b${escaped}\\b`);
 
   const declarationTypes = new Set([
     "class_declaration",
@@ -240,75 +235,59 @@ do {
     "constructor_declaration",
   ]);
 
-  const normalizedTarget =
-    symbolName.toLowerCase();
+  const normalizedTarget = symbolName.toLowerCase();
 
   return points.filter((result) => {
-      const payload = result.payload;
+    const payload = result.payload;
 
-      if (!payload.content) {
-        return false;
-      }
+    if (!payload.content) {
+      return false;
+    }
 
-      const normalizedSymbol =
-        payload.symbolName?.toLowerCase();
+    const normalizedSymbol = payload.symbolName?.toLowerCase();
 
-      if (
-        normalizedSymbol === normalizedTarget &&
-        declarationTypes.has(
-          payload.symbolType?.toLowerCase() ?? ""
-        )
-      ) {
-        return false;
-      }
+    const symbolType = payload.symbolType?.toLowerCase() ?? "";
 
-      if (
-        declarationTypes.has(
-          payload.symbolType?.toLowerCase() ?? ""
-        ) &&
-        (
-          payload.symbolType === "class_declaration" ||
-          payload.symbolType === "class_definition" ||
-          payload.symbolType === "interface_declaration" ||
-          payload.symbolType === "enum_declaration" ||
-          payload.symbolType === "record_declaration" ||
-          payload.symbolType === "type_declaration"
-        )
-      ) {
-        return false;
-      }
+    // Exclude the actual declaration of the requested symbol.
+    if (normalizedSymbol === normalizedTarget) {
+      return false;
+    }
 
-      const match =
-        usageRegex.exec(payload.content);
+    // Exclude large declaration/container chunks.
+    if (declarationTypes.has(symbolType)) {
+      return false;
+    }
 
-      if (!match) {
-        return false;
-      }
+    // Exclude assignment chunks that define another
+    // symbol, while keeping anonymous usage expressions.
+    if (
+      symbolType === "assignment_expression" &&
+      normalizedSymbol &&
+      normalizedSymbol !== normalizedTarget
+    ) {
+      return false;
+    }
 
-      const contentBeforeMatch =
-        payload.content.slice(
-          0,
-          match.index
-        );
+    const match = usageRegex.exec(payload.content);
 
-      const relativeLine =
-        contentBeforeMatch.split("\n").length - 1;
+    if (!match) {
+      return false;
+    }
 
-      payload.usageLine =
-        payload.startLine + relativeLine;
-        const matchedLine =
-  payload.content.split("\n")[relativeLine];
+    const contentBeforeMatch = payload.content.slice(0, match.index);
 
-payload.usageContent =
-  matchedLine?.trim() ?? symbolName;
+    const relativeLine = contentBeforeMatch.split("\n").length - 1;
 
-      return true;
-    });
+    payload.usageLine = payload.startLine + relativeLine;
+    const matchedLine = payload.content.split("\n")[relativeLine];
+
+    payload.usageContent = matchedLine?.trim() ?? symbolName;
+
+    return true;
+  });
 }
 
-export function isSymbolNavigationQuestion(
-  question: string
-): boolean {
+export function isSymbolNavigationQuestion(question: string): boolean {
   const normalized = question
     .toLowerCase()
     .replace(/[^a-z0-9_$]+/g, " ")
@@ -321,8 +300,9 @@ export function isSymbolNavigationQuestion(
    * symbol is defined, used, called, etc.
    */
   if (
-    /\b(where|defined|definition|constructed|constructor|created|located|used|usage|usages|referenced|references|reference|called|calls|invoked|invocations|instantiated|instantiation)\b/
-      .test(normalized)
+    /\b(where|defined|definition|constructed|constructor|created|located|used|usage|usages|referenced|references|reference|called|calls|invoked|invocations|instantiated|instantiation)\b/.test(
+      normalized,
+    )
   ) {
     return true;
   }
@@ -343,9 +323,7 @@ export function isSymbolNavigationQuestion(
     /\b(method|function|class)\b/.test(normalized);
 
   if (explanatoryNavigation) {
-    const identifiers = question.match(
-      /\b[A-Za-z_$][A-Za-z0-9_$]*\b/g
-    );
+    const identifiers = question.match(/\b[A-Za-z_$][A-Za-z0-9_$]*\b/g);
 
     const ignoredWords = new Set([
       "what",
@@ -363,10 +341,7 @@ export function isSymbolNavigationQuestion(
     ]);
 
     const hasSymbol = identifiers?.some(
-      (identifier) =>
-        !ignoredWords.has(
-          identifier.toLowerCase()
-        )
+      (identifier) => !ignoredWords.has(identifier.toLowerCase()),
     );
 
     return Boolean(hasSymbol);
@@ -378,7 +353,7 @@ export function isSymbolNavigationQuestion(
 export async function lookupSymbolsForQuestion(
   question: string,
   repositoryName?: string,
-  language?: string
+  language?: string,
 ): Promise<SymbolSearchResult[]> {
   const normalized = question
     .toLowerCase()
@@ -393,17 +368,13 @@ export async function lookupSymbolsForQuestion(
    *   What methods belong to UserService?
    */
   const parentMatch = question.match(
-    /(?:methods?|functions?)\s+(?:belong\s+to|of)\s+([A-Za-z_$][A-Za-z0-9_$]*)/i
+    /(?:methods?|functions?)\s+(?:belong\s+to|of)\s+([A-Za-z_$][A-Za-z0-9_$]*)/i,
   );
 
   if (parentMatch) {
-    return findSymbolsByParent(
-      parentMatch[1],
-      repositoryName,
-      language
-    );
+    return findSymbolsByParent(parentMatch[1], repositoryName, language);
   }
-    /*
+  /*
    * Questions asking what symbols/functions/classes
    * are inside a specific file should search by filePath.
    *
@@ -411,19 +382,14 @@ export async function lookupSymbolsForQuestion(
    *   What functions are inside lib/application.js?
    */
   const fileMatch = question.match(
-    /\b(?:inside|within|in)\s+([A-Za-z0-9_./-]+\.[A-Za-z0-9]+)\b/i
+    /\b(?:inside|within|in)\s+([A-Za-z0-9_./-]+\.[A-Za-z0-9]+)\b/i,
   );
 
   if (
     fileMatch &&
-    /\b(functions?|methods?|symbols?|classes?)\b/i.test(
-      question
-    )
+    /\b(functions?|methods?|symbols?|classes?)\b/i.test(question)
   ) {
-    return findSymbolsByFile(
-      fileMatch[1],
-      repositoryName
-    );
+    return findSymbolsByFile(fileMatch[1], repositoryName);
   }
 
   /*
@@ -432,10 +398,11 @@ export async function lookupSymbolsForQuestion(
    * should prefer exact symbol lookup.
    */
   const usageQuestion =
-  /\b(used|usage|usages|referenced|references|reference|called|calls|invoked|invocations|instantiated|instantiation)\b/
-    .test(normalized);
+    /\b(used|usage|usages|referenced|references|reference|called|calls|invoked|invocations|instantiated|instantiation)\b/.test(
+      normalized,
+    );
 
-const navigationQuestion = isSymbolNavigationQuestion(question);
+  const navigationQuestion = isSymbolNavigationQuestion(question);
   if (!navigationQuestion) {
     return [];
   }
@@ -446,110 +413,89 @@ const navigationQuestion = isSymbolNavigationQuestion(question);
    * Prefer a backtick-wrapped symbol:
    *   Where is `UserService` defined?
    */
-  const backtickMatch = question.match(
-    /`([A-Za-z_$][A-Za-z0-9_$]*)`/
-  );
+  const backtickMatch = question.match(/`([A-Za-z_$][A-Za-z0-9_$]*)`/);
 
   if (backtickMatch) {
-  const symbolName = backtickMatch[1];
+    const symbolName = backtickMatch[1];
 
-  if (usageQuestion) {
-    return findSymbolUsages(
-      symbolName,
-      repositoryName,
-      language
-    );
+    if (usageQuestion) {
+      return findSymbolUsages(symbolName, repositoryName, language);
+    }
+
+    return findSymbol(symbolName, repositoryName, language);
   }
-
-  return findSymbol(
-    symbolName,
-    repositoryName,
-    language
-  );
-}
 
   /*
    * Otherwise look for code-like identifiers.
    */
-  const identifiers = question.match(
-  /\b[A-Za-z_$][A-Za-z0-9_$]*\b/g
-);
+  const identifiers = question.match(/\b[A-Za-z_$][A-Za-z0-9_$]*\b/g);
 
-if (!identifiers || identifiers.length === 0) {
-  return [];
-}
+  if (!identifiers || identifiers.length === 0) {
+    return [];
+  }
 
-const ignoredWords = new Set([
-  "references",
-  "calls",
-  "does",
-  "do",
-  "invocations",
-  "instantiation",
-  "where",
-  "what",
-  "which",
-  "who",
-  "how",
-  "when",
-  "why",
-  "show",
-  "tell",
-  "is",
-  "are",
-  "was",
-  "were",
-  "the",
-  "a",
-  "an",
-  "in",
-  "of",
+  const ignoredWords = new Set([
+    "references",
+    "calls",
+    "does",
+    "do",
+    "invocations",
+    "instantiation",
+    "where",
+    "what",
+    "which",
+    "who",
+    "how",
+    "when",
+    "why",
+    "show",
+    "tell",
+    "is",
+    "are",
+    "was",
+    "were",
+    "the",
+    "a",
+    "an",
+    "in",
+    "of",
     "all",
-  "implementation",
-  "implementations",
-  "method",
-  "methods",
-  "function",
-  "functions",
-  "class",
-  "classes",
-  "me",
-  "to",
-  "for",
-  "from",
-  "on",
-  "at",
-  "defined",
-  "definition",
-  "used",
-  "usage",
-  "referenced",
-  "reference",
-  "called",
-  "invoked",
-  "created",
-  "located",
-]);
+    "implementation",
+    "implementations",
+    "method",
+    "methods",
+    "function",
+    "functions",
+    "class",
+    "classes",
+    "me",
+    "to",
+    "for",
+    "from",
+    "on",
+    "at",
+    "defined",
+    "definition",
+    "used",
+    "usage",
+    "referenced",
+    "reference",
+    "called",
+    "invoked",
+    "created",
+    "located",
+  ]);
 
-const symbolName =
-  identifiers.find(
-    (identifier) =>
-      !ignoredWords.has(identifier.toLowerCase())
-  ) ?? identifiers[0];
+  const symbolName =
+    identifiers.find(
+      (identifier) => !ignoredWords.has(identifier.toLowerCase()),
+    ) ?? identifiers[0];
 
-if (usageQuestion) {
-  return findSymbolUsages(
-    symbolName,
-    repositoryName,
-    language
-  );
-}
+  if (usageQuestion) {
+    return findSymbolUsages(symbolName, repositoryName, language);
+  }
 
-return findSymbol(
-  symbolName,
-  repositoryName,
-  language
-);
+  return findSymbol(symbolName, repositoryName, language);
 }
 
 export interface RepositorySymbolInventory {
@@ -578,29 +524,29 @@ export interface RepositorySymbolInventory {
 }
 
 export async function getRepositorySymbolInventory(
-  repositoryName: string
+  repositoryName: string,
 ): Promise<RepositorySymbolInventory> {
   const files = new Set<string>();
-  const symbols = new Map<string, RepositorySymbolInventory["symbols"][number]>();
+  const symbols = new Map<
+    string,
+    RepositorySymbolInventory["symbols"][number]
+  >();
 
   const fileSymbols = new Map<
     string,
     RepositorySymbolInventory["fileInventory"][number]
   >();
 
-  let offset: Awaited<
-    ReturnType<typeof qdrant.scroll>
-  >["next_page_offset"] = null;
+  let offset: Awaited<ReturnType<typeof qdrant.scroll>>["next_page_offset"] =
+    null;
 
   do {
-      const response = await qdrant.scroll(
-        COLLECTION_NAME,
-      {
-        limit: 1000,
-        offset: offset ?? undefined,
-        with_payload: true,
-        with_vector: false,
-        filter: {
+    const response = await qdrant.scroll(COLLECTION_NAME, {
+      limit: 1000,
+      offset: offset ?? undefined,
+      with_payload: true,
+      with_vector: false,
+      filter: {
         must: [
           {
             key: "repository",
@@ -613,8 +559,7 @@ export async function getRepositorySymbolInventory(
     });
 
     for (const point of response.points) {
-      const payload =
-        point.payload as VectorPayload;
+      const payload = point.payload as VectorPayload;
 
       if (payload.filePath) {
         files.add(payload.filePath);
@@ -628,11 +573,7 @@ export async function getRepositorySymbolInventory(
         }
       }
 
-      if (
-        !payload.symbolName ||
-        !payload.symbolType ||
-        !payload.filePath
-      ) {
+      if (!payload.symbolName || !payload.symbolType || !payload.filePath) {
         continue;
       }
 
@@ -659,22 +600,16 @@ export async function getRepositorySymbolInventory(
         symbols.set(symbolKey, symbol);
       }
 
-      const fileEntry = fileSymbols.get(
-        payload.filePath
-      )!;
+      const fileEntry = fileSymbols.get(payload.filePath)!;
 
-      const alreadyInFile =
-        fileEntry.symbols.some(
-          (existing) =>
-            existing.name === symbol.name &&
-            existing.type === symbol.type &&
-            existing.parentName ===
-              symbol.parentName &&
-            existing.startLine ===
-              symbol.startLine &&
-            existing.endLine ===
-              symbol.endLine
-        );
+      const alreadyInFile = fileEntry.symbols.some(
+        (existing) =>
+          existing.name === symbol.name &&
+          existing.type === symbol.type &&
+          existing.parentName === symbol.parentName &&
+          existing.startLine === symbol.startLine &&
+          existing.endLine === symbol.endLine,
+      );
 
       if (!alreadyInFile) {
         fileEntry.symbols.push({
@@ -693,63 +628,45 @@ export async function getRepositorySymbolInventory(
   return {
     repository: repositoryName,
     files: Array.from(files).sort(),
-    fileInventory: Array.from(
-      fileSymbols.values()
-    )
+    fileInventory: Array.from(fileSymbols.values())
       .map((file) => ({
         ...file,
         symbols: file.symbols.sort(
-          (a, b) =>
-            a.startLine - b.startLine ||
-            a.name.localeCompare(b.name)
+          (a, b) => a.startLine - b.startLine || a.name.localeCompare(b.name),
         ),
       }))
-      .sort((a, b) =>
-        a.filePath.localeCompare(b.filePath)
-      ),
+      .sort((a, b) => a.filePath.localeCompare(b.filePath)),
     symbols: Array.from(symbols.values()).sort(
       (a, b) =>
         a.filePath.localeCompare(b.filePath) ||
         a.startLine - b.startLine ||
-        a.name.localeCompare(b.name)
+        a.name.localeCompare(b.name),
     ),
   };
 }
-export function isRepositoryInventoryQuestion(
-  question: string
-): boolean {
+export function isRepositoryInventoryQuestion(question: string): boolean {
   const normalized = question
     .toLowerCase()
     .replace(/[^a-z0-9_$]+/g, " ")
     .trim();
 
-    return (
-  /\b(main\s+modules?|main\s+directories?|module\s+overview)\b/.test(
-    normalized
-  ) ||
-  /\b(tree|folder\s+structure|directory\s+structure)\b/.test(
-    normalized
-  ) ||
-  /\b(repository|codebase|project)\s+(structure|overview)\b/.test(
-    normalized
-  ) ||
-  /\bwhat\s+is\s+the\s+(structure|overview)\s+of\s+(this\s+)?(repository|codebase|project)\b/.test(
-    normalized
-  ) ||
-  /\bwhat\s+(files|symbols|functions|classes)\b/.test(
-    normalized
-  ) ||
-  /\b(project|repository|codebase)\s+files\b/.test(
-    normalized
-  ) ||
-  /\b(what\s+)?(directories|directory|folders|folder)\b/.test(
-    normalized
-  ) ||
-  /\b(inside|within)\s+[a-z0-9_-]+\b/.test(
-    normalized
-  ) ||
-  /\bcomponents\b/.test(normalized)
-);
+  return (
+    /\b(main\s+modules?|main\s+directories?|module\s+overview)\b/.test(
+      normalized,
+    ) ||
+    /\b(tree|folder\s+structure|directory\s+structure)\b/.test(normalized) ||
+    /\b(repository|codebase|project)\s+(structure|overview)\b/.test(
+      normalized,
+    ) ||
+    /\bwhat\s+is\s+the\s+(structure|overview)\s+of\s+(this\s+)?(repository|codebase|project)\b/.test(
+      normalized,
+    ) ||
+    /\bwhat\s+(files|symbols|functions|classes)\b/.test(normalized) ||
+    /\b(project|repository|codebase)\s+files\b/.test(normalized) ||
+    /\b(what\s+)?(directories|directory|folders|folder)\b/.test(normalized) ||
+    /\b(inside|within)\s+[a-z0-9_-]+\b/.test(normalized) ||
+    /\bcomponents\b/.test(normalized)
+  );
 }
 export type RepositoryInventoryQuestionType =
   | "files"
@@ -761,7 +678,7 @@ export type RepositoryInventoryQuestionType =
   | "overview";
 
 export function getRepositoryInventoryQuestionType(
-  question: string
+  question: string,
 ): RepositoryInventoryQuestionType {
   const normalized = question
     .toLowerCase()
@@ -769,66 +686,46 @@ export function getRepositoryInventoryQuestionType(
     .trim();
 
   if (/\b(files?|file)\b/.test(normalized)) {
-  return "files";
-}
-if (
-  /\b(main\s+modules?|main\s+directories?|module\s+overview)\b/.test(
-    normalized
-  )
-) {
-  return "module_overview";
-}
+    return "files";
+  }
+  if (
+    /\b(main\s+modules?|main\s+directories?|module\s+overview)\b/.test(
+      normalized,
+    )
+  ) {
+    return "module_overview";
+  }
 
-if (
-  /\b(tree|folder\s+structure|directory\s+structure)\b/.test(
-    normalized
-  )
-) {
-  return "tree";
-}
+  if (/\b(tree|folder\s+structure|directory\s+structure)\b/.test(normalized)) {
+    return "tree";
+  }
 
-if (
-  /\b(directory|directories|folder|folders)\b/.test(
-    normalized
-  )
-) {
-  return "directories";
-}
+  if (/\b(directory|directories|folder|folders)\b/.test(normalized)) {
+    return "directories";
+  }
 
-if (
-  /\b(inside|within)\s+[a-z0-9_./-]+/.test(
-    normalized
-  )
-) {
-  return "directory_contents";
-}
+  if (/\b(inside|within)\s+[a-z0-9_./-]+/.test(normalized)) {
+    return "directory_contents";
+  }
 
-if (
-  /\b(functions?|methods?|symbols?|classes?)\b/.test(
-    normalized
-  )
-) {
-  return "symbols";
-}
+  if (/\b(functions?|methods?|symbols?|classes?)\b/.test(normalized)) {
+    return "symbols";
+  }
 
   return "overview";
 }
-export function extractRepositoryDirectory(
-  question: string
-): string | null {
+export function extractRepositoryDirectory(question: string): string | null {
   const normalized = question
     .toLowerCase()
     .replace(/[^a-z0-9_./-]+/g, " ")
     .trim();
 
-  const match = normalized.match(
-    /\b(?:inside|within)\s+([a-z0-9_./-]+)/
-  );
+  const match = normalized.match(/\b(?:inside|within)\s+([a-z0-9_./-]+)/);
 
   return match?.[1] ?? null;
 }
 export function buildRepositoryDirectories(
-  inventory: RepositorySymbolInventory
+  inventory: RepositorySymbolInventory,
 ): string[] {
   const directories = new Set<string>();
 
@@ -848,11 +745,9 @@ export function buildRepositoryDirectories(
 }
 export function buildRepositoryDirectoryContents(
   inventory: RepositorySymbolInventory,
-  directory: string
+  directory: string,
 ): string[] {
-  const normalizedDirectory = directory
-    .replace(/^\/+|\/+$/g, "")
-    .toLowerCase();
+  const normalizedDirectory = directory.replace(/^\/+|\/+$/g, "").toLowerCase();
 
   const prefix = `${normalizedDirectory}/`;
 
@@ -862,15 +757,13 @@ export function buildRepositoryDirectoryContents(
 
       return (
         normalizedFilePath.startsWith(prefix) &&
-        !normalizedFilePath
-          .slice(prefix.length)
-          .includes("/")
+        !normalizedFilePath.slice(prefix.length).includes("/")
       );
     })
     .sort();
 }
 export function buildRepositoryTree(
-  inventory: RepositorySymbolInventory
+  inventory: RepositorySymbolInventory,
 ): string {
   const root: {
     directories: Map<string, any>;
@@ -907,11 +800,9 @@ export function buildRepositoryTree(
       directories: Map<string, any>;
       files: string[];
     },
-    prefix: string
+    prefix: string,
   ) {
-    const directories = Array.from(
-      node.directories.keys()
-    ).sort();
+    const directories = Array.from(node.directories.keys()).sort();
 
     const files = [...node.files].sort();
 
@@ -933,18 +824,13 @@ export function buildRepositoryTree(
       lines.push(
         `${prefix}${connector}${entry.name}${
           entry.type === "directory" ? "/" : ""
-        }`
+        }`,
       );
 
       if (entry.type === "directory") {
-        const child = node.directories.get(
-          entry.name
-        );
+        const child = node.directories.get(entry.name);
 
-        render(
-          child,
-          `${prefix}${isLast ? "    " : "│   "}`
-        );
+        render(child, `${prefix}${isLast ? "    " : "│   "}`);
       }
     });
   }
@@ -955,14 +841,12 @@ export function buildRepositoryTree(
   return lines.join("\n");
 }
 export function buildRepositoryModuleOverview(
-  inventory: RepositorySymbolInventory
+  inventory: RepositorySymbolInventory,
 ): string {
-  const directories = buildRepositoryDirectories(
-    inventory
-  );
+  const directories = buildRepositoryDirectories(inventory);
 
   const topLevelDirectories = directories.filter(
-    (directory) => !directory.includes("/")
+    (directory) => !directory.includes("/"),
   );
 
   const lines = [
@@ -977,19 +861,16 @@ export function buildRepositoryModuleOverview(
     const files = inventory.files.filter(
       (filePath) =>
         filePath.startsWith(prefix) &&
-        !filePath
-          .slice(prefix.length)
-          .includes("/")
+        !filePath.slice(prefix.length).includes("/"),
     );
 
     const childDirectories = directories.filter(
       (child) =>
-        child.startsWith(prefix) &&
-        !child.slice(prefix.length).includes("/")
+        child.startsWith(prefix) && !child.slice(prefix.length).includes("/"),
     );
 
     lines.push(
-      `- ${directory}/ — ${files.length} files, ${childDirectories.length} subdirectories`
+      `- ${directory}/ — ${files.length} files, ${childDirectories.length} subdirectories`,
     );
   }
 
@@ -997,25 +878,20 @@ export function buildRepositoryModuleOverview(
 }
 
 export function buildRepositoryOverview(
-  inventory: RepositorySymbolInventory
+  inventory: RepositorySymbolInventory,
 ): string {
   const languageCounts = new Map<string, number>();
 
   for (const file of inventory.fileInventory) {
     languageCounts.set(
       file.language,
-      (languageCounts.get(file.language) ?? 0) + 1
+      (languageCounts.get(file.language) ?? 0) + 1,
     );
   }
 
-  const languageLines = Array.from(
-    languageCounts.entries()
-  )
+  const languageLines = Array.from(languageCounts.entries())
     .sort((a, b) => b[1] - a[1])
-    .map(
-      ([language, count]) =>
-        `- ${language}: ${count} files`
-    );
+    .map(([language, count]) => `- ${language}: ${count} files`);
 
   return [
     `Repository: ${inventory.repository}`,

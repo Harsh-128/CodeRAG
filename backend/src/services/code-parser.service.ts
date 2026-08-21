@@ -2,18 +2,10 @@ import Parser from "tree-sitter";
 import JavaScript from "tree-sitter-javascript";
 import Python from "tree-sitter-python";
 import Go from "tree-sitter-go";
-import {
-  parse as parseJava,
-  type CstNode,
-  type IToken,
-} from "java-parser";
+import { parse as parseJava, type CstNode, type IToken } from "java-parser";
 
 export type SupportedLanguage =
-  | "javascript"
-  | "typescript"
-  | "python"
-  | "go"
-  | "java";
+  "javascript" | "typescript" | "python" | "go" | "java";
 
 export interface CodeNode {
   type: string;
@@ -26,9 +18,7 @@ export interface CodeNode {
   code: string;
 }
 
-function getLanguageGrammar(
-  language: SupportedLanguage
-) {
+function getLanguageGrammar(language: SupportedLanguage) {
   switch (language) {
     case "javascript":
     case "typescript":
@@ -41,20 +31,14 @@ function getLanguageGrammar(
       return Go;
 
     case "java":
-      throw new Error(
-        "Java uses java-parser instead of tree-sitter."
-      );
+      throw new Error("Java uses java-parser instead of tree-sitter.");
 
     default:
-      throw new Error(
-        `Unsupported language: ${language}`
-      );
+      throw new Error(`Unsupported language: ${language}`);
   }
 }
 
-function getInterestingTypes(
-  language: SupportedLanguage
-): Set<string> {
+function getInterestingTypes(language: SupportedLanguage): Set<string> {
   switch (language) {
     case "javascript":
     case "typescript":
@@ -65,13 +49,11 @@ function getInterestingTypes(
         "method_definition",
         "class_declaration",
         "variable_declaration",
+        "assignment_expression",
       ]);
 
     case "python":
-      return new Set([
-        "function_definition",
-        "class_definition",
-      ]);
+      return new Set(["function_definition", "class_definition"]);
 
     case "go":
       return new Set([
@@ -88,24 +70,18 @@ function getInterestingTypes(
   }
 }
 
-function getNodeName(
-  node: Parser.SyntaxNode
-): string | undefined {
-  const nameNode =
-    node.childForFieldName("name");
+function getNodeName(node: Parser.SyntaxNode): string | undefined {
+  const nameNode = node.childForFieldName("name");
 
   if (nameNode) {
     return nameNode.text;
   }
   if (node.type === "variable_declaration") {
-    const declarator =
-      node.namedChildren.find(
-        (child) =>
-          child.type === "variable_declarator"
-      );
+    const declarator = node.namedChildren.find(
+      (child) => child.type === "variable_declarator",
+    );
 
-    const nameNode =
-      declarator?.childForFieldName("name");
+    const nameNode = declarator?.childForFieldName("name");
 
     if (nameNode) {
       return nameNode.text;
@@ -113,15 +89,10 @@ function getNodeName(
   }
 
   if (node.type === "type_declaration") {
-    const spec =
-      node.namedChildren.find(
-        (child) =>
-          child.type === "type_spec"
-      );
+    const spec = node.namedChildren.find((child) => child.type === "type_spec");
 
     if (spec) {
-      const typeName =
-        spec.childForFieldName("name");
+      const typeName = spec.childForFieldName("name");
 
       if (typeName) {
         return typeName.text;
@@ -131,24 +102,49 @@ function getNodeName(
 
   return undefined;
 }
+function getAssignmentInfo(node: Parser.SyntaxNode): {
+  name?: string;
+  parentName?: string;
+} {
+  if (node.type !== "assignment_expression") {
+    return {};
+  }
 
-function getGoMethodParentName(
-  node: Parser.SyntaxNode
-): string | undefined {
-  const receiver =
-    node.childForFieldName("receiver");
+  const left = node.childForFieldName("left");
+  const right = node.childForFieldName("right");
+
+  if (!left || !right || right.type !== "function_expression") {
+    return {};
+  }
+
+  const nameNode = right.childForFieldName("name");
+
+  const parts = left.text.split(".");
+
+  if (parts.length < 2) {
+    return {
+      name: nameNode?.text,
+    };
+  }
+
+  return {
+    name: nameNode?.text ?? parts[parts.length - 1],
+    parentName: parts.slice(0, -1).join("."),
+  };
+}
+
+function getGoMethodParentName(node: Parser.SyntaxNode): string | undefined {
+  const receiver = node.childForFieldName("receiver");
 
   if (!receiver) {
     return undefined;
   }
 
-  const receiverText =
-    receiver.text;
+  const receiverText = receiver.text;
 
-  const match =
-    receiverText.match(
-      /\b([A-Z_a-z][A-Za-z0-9_]*)\s*(?:\[.*\])?\s*\)?$/
-    );
+  const match = receiverText.match(
+    /\b([A-Z_a-z][A-Za-z0-9_]*)\s*(?:\[.*\])?\s*\)?$/,
+  );
 
   if (!match) {
     return undefined;
@@ -161,9 +157,7 @@ function getGoMethodParentName(
 /* Java CST helpers                                                            */
 /* -------------------------------------------------------------------------- */
 
-function isJavaCstNode(
-  value: unknown
-): value is CstNode {
+function isJavaCstNode(value: unknown): value is CstNode {
   return (
     typeof value === "object" &&
     value !== null &&
@@ -175,205 +169,129 @@ function isJavaCstNode(
 
 function getFirstTokenImage(
   node: CstNode,
-  tokenName: string
+  tokenName: string,
 ): string | undefined {
-  const children =
-    node.children as Record<
-      string,
-      unknown
-    >;
+  const children = node.children as Record<string, unknown>;
 
-  const elements =
-    children[tokenName];
+  const elements = children[tokenName];
 
   if (!Array.isArray(elements)) {
     return undefined;
   }
 
-  const token =
-    elements.find(
-      (element): element is IToken =>
-        typeof element === "object" &&
-        element !== null &&
-        "image" in element
-    );
+  const token = elements.find(
+    (element): element is IToken =>
+      typeof element === "object" && element !== null && "image" in element,
+  );
 
   return token?.image;
 }
 
 function getNestedCstNode(
   node: CstNode,
-  childName: string
+  childName: string,
 ): CstNode | undefined {
-  const children =
-    node.children as Record<
-      string,
-      unknown
-    >;
+  const children = node.children as Record<string, unknown>;
 
-  const elements =
-    children[childName];
+  const elements = children[childName];
 
   if (!Array.isArray(elements)) {
     return undefined;
   }
 
-  return elements.find(
-    isJavaCstNode
-  );
+  return elements.find(isJavaCstNode);
 }
 
-function getJavaTypeIdentifierName(
-  node: CstNode
-): string | undefined {
-  const typeIdentifier =
-    getNestedCstNode(
-      node,
-      "typeIdentifier"
-    );
+function getJavaTypeIdentifierName(node: CstNode): string | undefined {
+  const typeIdentifier = getNestedCstNode(node, "typeIdentifier");
 
   if (!typeIdentifier) {
     return undefined;
   }
 
-  return getFirstTokenImage(
-    typeIdentifier,
-    "Identifier"
-  );
+  return getFirstTokenImage(typeIdentifier, "Identifier");
 }
 
-function getJavaMethodName(
-  node: CstNode
-): string | undefined {
-  const methodHeader =
-    getNestedCstNode(
-      node,
-      "methodHeader"
-    );
+function getJavaMethodName(node: CstNode): string | undefined {
+  const methodHeader = getNestedCstNode(node, "methodHeader");
 
   if (!methodHeader) {
     return undefined;
   }
 
-  const methodDeclarator =
-    getNestedCstNode(
-      methodHeader,
-      "methodDeclarator"
-    );
+  const methodDeclarator = getNestedCstNode(methodHeader, "methodDeclarator");
 
   if (!methodDeclarator) {
     return undefined;
   }
 
-  return getFirstTokenImage(
-    methodDeclarator,
-    "Identifier"
-  );
+  return getFirstTokenImage(methodDeclarator, "Identifier");
 }
 
-function getJavaConstructorName(
-  node: CstNode
-): string | undefined {
-  const constructorDeclarator =
-    getNestedCstNode(
-      node,
-      "constructorDeclarator"
-    );
+function getJavaConstructorName(node: CstNode): string | undefined {
+  const constructorDeclarator = getNestedCstNode(node, "constructorDeclarator");
 
   if (!constructorDeclarator) {
     return undefined;
   }
 
-  const simpleTypeName =
-    getNestedCstNode(
-      constructorDeclarator,
-      "simpleTypeName"
-    );
+  const simpleTypeName = getNestedCstNode(
+    constructorDeclarator,
+    "simpleTypeName",
+  );
 
   if (!simpleTypeName) {
     return undefined;
   }
 
-  const typeIdentifier =
-    getNestedCstNode(
-      simpleTypeName,
-      "typeIdentifier"
-    );
+  const typeIdentifier = getNestedCstNode(simpleTypeName, "typeIdentifier");
 
   if (!typeIdentifier) {
     return undefined;
   }
 
-  return getFirstTokenImage(
-    typeIdentifier,
-    "Identifier"
-  );
+  return getFirstTokenImage(typeIdentifier, "Identifier");
 }
 
-function getJavaInterfaceMethodName(
-  node: CstNode
-): string | undefined {
-  const methodHeader =
-    getNestedCstNode(
-      node,
-      "methodHeader"
-    );
+function getJavaInterfaceMethodName(node: CstNode): string | undefined {
+  const methodHeader = getNestedCstNode(node, "methodHeader");
 
   if (!methodHeader) {
     return undefined;
   }
 
-  const methodDeclarator =
-    getNestedCstNode(
-      methodHeader,
-      "methodDeclarator"
-    );
+  const methodDeclarator = getNestedCstNode(methodHeader, "methodDeclarator");
 
   if (!methodDeclarator) {
     return undefined;
   }
 
-  return getFirstTokenImage(
-    methodDeclarator,
-    "Identifier"
-  );
+  return getFirstTokenImage(methodDeclarator, "Identifier");
 }
 
-function getJavaNodeName(
-  node: CstNode
-): string | undefined {
+function getJavaNodeName(node: CstNode): string | undefined {
   switch (node.name) {
     case "normalClassDeclaration":
     case "enumDeclaration":
     case "recordDeclaration":
     case "normalInterfaceDeclaration":
-      return getJavaTypeIdentifierName(
-        node
-      );
+      return getJavaTypeIdentifierName(node);
 
     case "methodDeclaration":
-      return getJavaMethodName(
-        node
-      );
+      return getJavaMethodName(node);
 
     case "interfaceMethodDeclaration":
-      return getJavaInterfaceMethodName(
-        node
-      );
+      return getJavaInterfaceMethodName(node);
 
     case "constructorDeclaration":
-      return getJavaConstructorName(
-        node
-      );
+      return getJavaConstructorName(node);
 
     default:
       return undefined;
   }
 }
 
-function getJavaSemanticType(
-  node: CstNode
-): string | undefined {
+function getJavaSemanticType(node: CstNode): string | undefined {
   switch (node.name) {
     case "normalClassDeclaration":
       return "class_declaration";
@@ -402,121 +320,75 @@ function getJavaSemanticType(
 function createJavaCodeNode(
   node: CstNode,
   parentName?: string,
-  sourceCode?: string
+  sourceCode?: string,
 ): CodeNode | undefined {
-  const type =
-    getJavaSemanticType(node);
+  const type = getJavaSemanticType(node);
 
   if (!type || !sourceCode) {
     return undefined;
   }
 
-  const name =
-    getJavaNodeName(node);
+  const name = getJavaNodeName(node);
 
-  const location =
-    node.location;
+  const location = node.location;
 
-  const startOffset =
-    location.startOffset;
+  const startOffset = location.startOffset;
 
-  const endOffset =
-    location.endOffset;
+  const endOffset = location.endOffset;
 
-  const code =
-    sourceCode.slice(
-      startOffset,
-      endOffset + 1
-    );
+  const code = sourceCode.slice(startOffset, endOffset + 1);
 
   return {
     type,
     name,
     parentName,
-    startLine:
-      location.startLine,
-    endLine:
-      location.endLine,
-    startColumn:
-      Math.max(
-        0,
-        location.startColumn - 1
-      ),
-    endColumn:
-      Math.max(
-        0,
-        location.endColumn - 1
-      ),
+    startLine: location.startLine,
+    endLine: location.endLine,
+    startColumn: Math.max(0, location.startColumn - 1),
+    endColumn: Math.max(0, location.endColumn - 1),
     code,
   };
 }
 
-function parseJavaCode(
-  sourceCode: string
-): CodeNode[] {
-  const cst =
-    parseJava(sourceCode);
+function parseJavaCode(sourceCode: string): CodeNode[] {
+  const cst = parseJava(sourceCode);
 
   const nodes: CodeNode[] = [];
 
-  function walk(
-    node: CstNode,
-    parentName?: string
-  ): void {
-    const semanticType =
-      getJavaSemanticType(node);
+  function walk(node: CstNode, parentName?: string): void {
+    const semanticType = getJavaSemanticType(node);
 
-    let currentParentName =
-      parentName;
+    let currentParentName = parentName;
 
     if (semanticType) {
-      const codeNode =
-        createJavaCodeNode(
-          node,
-          parentName,
-          sourceCode
-        );
+      const codeNode = createJavaCodeNode(node, parentName, sourceCode);
 
       if (codeNode) {
         nodes.push(codeNode);
 
         if (
-          codeNode.type ===
-            "class_declaration" ||
-          codeNode.type ===
-            "interface_declaration" ||
-          codeNode.type ===
-            "enum_declaration" ||
-          codeNode.type ===
-            "record_declaration"
+          codeNode.type === "class_declaration" ||
+          codeNode.type === "interface_declaration" ||
+          codeNode.type === "enum_declaration" ||
+          codeNode.type === "record_declaration"
         ) {
           if (codeNode.name) {
-            currentParentName =
-              codeNode.name;
+            currentParentName = codeNode.name;
           }
         }
       }
     }
 
-    const children =
-      node.children as Record<
-        string,
-        unknown
-      >;
+    const children = node.children as Record<string, unknown>;
 
-    for (const elements of Object.values(
-      children
-    )) {
+    for (const elements of Object.values(children)) {
       if (!Array.isArray(elements)) {
         continue;
       }
 
       for (const element of elements) {
         if (isJavaCstNode(element)) {
-          walk(
-            element,
-            currentParentName
-          );
+          walk(element, currentParentName);
         }
       }
     }
@@ -529,86 +401,57 @@ function parseJavaCode(
 
 export function parseCode(
   sourceCode: string,
-  language: SupportedLanguage
+  language: SupportedLanguage,
 ): CodeNode[] {
   if (language === "java") {
-    return parseJavaCode(
-      sourceCode
-    );
+    return parseJavaCode(sourceCode);
   }
 
   const parser = new Parser();
 
-  parser.setLanguage(
-    getLanguageGrammar(language)
-  );
+  parser.setLanguage(getLanguageGrammar(language));
 
-  const tree =
-    parser.parse(sourceCode);
+  const tree = parser.parse(sourceCode);
 
   const nodes: CodeNode[] = [];
 
-  const interestingTypes =
-    getInterestingTypes(language);
+  const interestingTypes = getInterestingTypes(language);
 
-  function walk(
-    node: Parser.SyntaxNode,
-    parentName?: string
-  ): void {
-    let currentParentName =
-      parentName;
+  function walk(node: Parser.SyntaxNode, parentName?: string): void {
+    let currentParentName = parentName;
 
     if (
       interestingTypes.has(node.type) &&
-      (
-        node.type !== "variable_declaration" ||
-        node.text.includes("require(")
-      )
+      (node.type !== "variable_declaration" || node.text.includes("require("))
     ) {
-      const name =
-        getNodeName(node);
+      const assignmentInfo = getAssignmentInfo(node);
 
-      let resolvedParentName =
-        parentName;
+      const name = assignmentInfo.name ?? getNodeName(node);
 
-      if (
-        language === "go" &&
-        node.type ===
-          "method_declaration"
-      ) {
-        resolvedParentName =
-          getGoMethodParentName(
-            node
-          );
+      let resolvedParentName = assignmentInfo.parentName ?? parentName;
+
+      if (language === "go" && node.type === "method_declaration") {
+        resolvedParentName = getGoMethodParentName(node);
       }
 
       nodes.push({
         type: node.type,
         name,
-        parentName:
-          resolvedParentName,
-        startLine:
-          node.startPosition.row + 1,
-        endLine:
-          node.endPosition.row + 1,
-        startColumn:
-          node.startPosition.column,
-        endColumn:
-          node.endPosition.column,
+        parentName: resolvedParentName,
+        startLine: node.startPosition.row + 1,
+        endLine: node.endPosition.row + 1,
+        startColumn: node.startPosition.column,
+        endColumn: node.endPosition.column,
         code: node.text,
       });
 
       if (name) {
-        currentParentName =
-          name;
+        currentParentName = name;
       }
     }
 
     for (const child of node.namedChildren) {
-      walk(
-        child,
-        currentParentName
-      );
+      walk(child, currentParentName);
     }
   }
 
@@ -621,11 +464,6 @@ export function parseCode(
  * Backwards-compatible wrapper
  * for existing JavaScript tests.
  */
-export function parseJavaScriptCode(
-  sourceCode: string
-): CodeNode[] {
-  return parseCode(
-    sourceCode,
-    "javascript"
-  );
+export function parseJavaScriptCode(sourceCode: string): CodeNode[] {
+  return parseCode(sourceCode, "javascript");
 }
