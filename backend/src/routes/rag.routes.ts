@@ -180,10 +180,31 @@ export async function ragRoutes(app: FastifyInstance) {
           })
           .join("\n\n");
 
-        const answer = await generateAnswer(
-          question,
-          context
-        );
+        const requestedSymbol =
+          question.match(
+            /`([A-Za-z_$][A-Za-z0-9_$]*)`/
+          )?.[1] ??
+          question.match(
+            /\b(?:where\s+is|where\s+are|find|locate)\s+([A-Za-z_$][A-Za-z0-9_$]*)\b/i
+          )?.[1] ??
+          "symbol";
+
+        const answer = [
+          `The \`${requestedSymbol}\` is used in:`,
+          ...symbolResults.slice(0, 10).map((result) => {
+            const payload = result.payload;
+
+            const location =
+              `${payload.filePath}:${payload.usageLine ?? payload.startLine}`;
+
+            const usage =
+              payload.usageContent
+                ? ` — ${payload.usageContent}`
+                : "";
+
+            return `- ${location}${usage}`;
+          }),
+        ].join("\n");
 
         const sources = symbolResults
           .slice(0, 5)
@@ -195,6 +216,8 @@ export async function ragRoutes(app: FastifyInstance) {
             startLine: result.payload.startLine,
             endLine: result.payload.endLine,
             usageLine: result.payload.usageLine ?? null,
+            usageContent:
+              result.payload.usageContent ?? null,
           }));
 
         return {
