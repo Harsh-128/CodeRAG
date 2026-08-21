@@ -106,6 +106,30 @@ export async function findSymbolsByParent(
   });
 
   return response.points
+    .filter((point) => {
+      const payload = point.payload as SymbolSearchResult["payload"];
+
+      const symbolType = payload.symbolType?.toLowerCase() ?? "";
+
+      if (
+        symbolType === "method_declaration" ||
+        symbolType === "method_definition" ||
+        symbolType === "function_declaration" ||
+        symbolType === "function_definition"
+      ) {
+        return true;
+      }
+
+      if (symbolType === "assignment_expression") {
+        const symbolName = payload.symbolName ?? "";
+
+        // JavaScript prototype methods are represented
+        // as assignment_expression nodes.
+        return symbolName.length > 0 && payload.content.includes("function");
+      }
+
+      return false;
+    })
     .map((point) => ({
       id: point.id,
       payload: point.payload as SymbolSearchResult["payload"],
@@ -117,13 +141,8 @@ export async function findSymbolsByParent(
       const aIsLib = aFile.startsWith("lib/");
       const bIsLib = bFile.startsWith("lib/");
 
-      if (aIsLib && !bIsLib) {
-        return -1;
-      }
-
-      if (!aIsLib && bIsLib) {
-        return 1;
-      }
+      if (aIsLib && !bIsLib) return -1;
+      if (!aIsLib && bIsLib) return 1;
 
       return a.payload.startLine - b.payload.startLine;
     });
@@ -172,6 +191,8 @@ async function findSymbolUsages(
   repositoryName?: string,
   language?: string,
 ): Promise<SymbolSearchResult[]> {
+  const normalizedTarget = symbolName.toLowerCase();
+
   const must: any[] = [];
 
   if (repositoryName) {
@@ -235,8 +256,6 @@ async function findSymbolUsages(
     "constructor_declaration",
   ]);
 
-  const normalizedTarget = symbolName.toLowerCase();
-
   return points.filter((result) => {
     const payload = result.payload;
 
@@ -248,23 +267,34 @@ async function findSymbolUsages(
 
     const symbolType = payload.symbolType?.toLowerCase() ?? "";
 
+    // Exclude declaration/container chunks.
+    // Do not exclude based on symbolName alone because legitimate
+    // usage chunks may carry the same symbolName.
+    const isDeclaration = declarationTypes.has(symbolType);
+
+    const isExactDeclaration =
+      normalizedSymbol === normalizedTarget && isDeclaration;
+
     // Exclude the actual declaration of the requested symbol.
-    if (normalizedSymbol === normalizedTarget) {
+    if (isExactDeclaration) {
       return false;
     }
 
-    // Exclude large declaration/container chunks.
-    if (declarationTypes.has(symbolType)) {
-      return false;
-    }
+    // Exclude class/interface/enum/type containers.
+    // Their nested methods/usages are represented separately.
+    const containerTypes = new Set([
+      "class_declaration",
+      "class_definition",
+      "interface_declaration",
+      "interface_definition",
+      "enum_declaration",
+      "enum_definition",
+      "record_declaration",
+      "record_definition",
+      "type_declaration",
+    ]);
 
-    // Exclude assignment chunks that define another
-    // symbol, while keeping anonymous usage expressions.
-    if (
-      symbolType === "assignment_expression" &&
-      normalizedSymbol &&
-      normalizedSymbol !== normalizedTarget
-    ) {
+    if (containerTypes.has(symbolType)) {
       return false;
     }
 

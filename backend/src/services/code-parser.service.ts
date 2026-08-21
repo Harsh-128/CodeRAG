@@ -119,17 +119,25 @@ function getAssignmentInfo(node: Parser.SyntaxNode): {
 
   const nameNode = right.childForFieldName("name");
 
+  if (!nameNode) {
+    return {};
+  }
+
   const parts = left.text.split(".");
 
   if (parts.length < 2) {
-    return {
-      name: nameNode?.text,
-    };
+    return {};
+  }
+
+  let parentName = parts.slice(0, -1).join(".");
+
+  if (parentName.endsWith(".prototype")) {
+    parentName = parentName.slice(0, -".prototype".length);
   }
 
   return {
-    name: nameNode?.text ?? parts[parts.length - 1],
-    parentName: parts.slice(0, -1).join("."),
+    name: nameNode.text,
+    parentName,
   };
 }
 
@@ -445,7 +453,29 @@ export function parseCode(
         code: node.text,
       });
 
-      if (name) {
+      /*
+       * Only declarations that introduce a
+       * containing scope should become the
+       * parent for their children.
+       *
+       * Assignment expressions such as:
+       *
+       * View.prototype.render =
+       *   function render() {}
+       *
+       * already get their parent from
+       * getAssignmentInfo().
+       */
+      if (
+        name &&
+        (node.type === "class_declaration" ||
+          node.type === "class_definition" ||
+          node.type === "interface_declaration" ||
+          node.type === "enum_declaration" ||
+          node.type === "record_declaration" ||
+          node.type === "function_declaration" ||
+          node.type === "function_definition")
+      ) {
         currentParentName = name;
       }
     }
@@ -459,7 +489,6 @@ export function parseCode(
 
   return nodes;
 }
-
 /**
  * Backwards-compatible wrapper
  * for existing JavaScript tests.
