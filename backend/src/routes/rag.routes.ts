@@ -163,15 +163,20 @@ export async function ragRoutes(app: FastifyInstance) {
           })
           .join("\n\n");
 
+        const symbolExtractionPatterns = [
+          /`([A-Za-z_$][A-Za-z0-9_$]*)`/,
+          /\b(?:where\s+is|where\s+are|find|locate)\s+([A-Za-z_$][A-Za-z0-9_$]*)\b/i,
+          /(?:belong\s+to|of)\s+([A-Za-z_$][A-Za-z0-9_$]*)/i,
+        ];
+
         const requestedSymbol =
-          question.match(/`([A-Za-z_$][A-Za-z0-9_$]*)`/)?.[1] ??
-          question.match(
-            /\b(?:where\s+is|where\s+are|find|locate)\s+([A-Za-z_$][A-Za-z0-9_$]*)\b/i,
-          )?.[1] ??
-          question.match(
-            /(?:belong\s+to|of)\s+([A-Za-z_$][A-Za-z0-9_$]*)/i,
-          )?.[1] ??
-          "symbol";
+          symbolExtractionPatterns
+            .map((pattern) => question.match(pattern)?.[1])
+            .find(
+              (symbol) =>
+                symbol !== undefined &&
+                !["the", "a", "an"].includes(symbol.toLowerCase()),
+            ) ?? "symbol";
 
         const isParentMethodQuestion =
           /\b(?:methods?|functions?)\s+(?:belong\s+to|of)\b/i.test(question);

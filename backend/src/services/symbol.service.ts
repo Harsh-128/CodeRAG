@@ -329,12 +329,75 @@ export function isSymbolNavigationQuestion(question: string): boolean {
    * These questions are explicitly asking where a
    * symbol is defined, used, called, etc.
    */
-  if (
-    /\b(where|defined|definition|constructed|constructor|created|located|used|usage|usages|referenced|references|reference|called|calls|invoked|invocations|instantiated|instantiation)\b/.test(
+  const directNavigation =
+    /\b(defined|definition|constructed|constructor|created|located|used|usage|usages|referenced|references|reference|called|calls|invoked|invocations|instantiated|instantiation)\b/.test(
       normalized,
-    )
-  ) {
+    );
+
+  const hasExplicitSymbol = /`[A-Za-z_$][A-Za-z0-9_$]*`/.test(question);
+
+  const hasLikelyCodeSymbol =
+    /\b[A-Za-z_$][A-Za-z0-9_$]*(?:\.[A-Za-z_$][A-Za-z0-9_$]*)?\s*(?:\(|\.prototype\b)/.test(
+      question,
+    );
+
+  if (directNavigation && (hasExplicitSymbol || hasLikelyCodeSymbol)) {
     return true;
+  }
+
+  if (directNavigation) {
+    const identifiers = question.match(/\b[A-Za-z_$][A-Za-z0-9_$]*\b/g);
+
+    const ignoredWords = new Set([
+      "where",
+      "what",
+      "which",
+      "who",
+      "how",
+      "when",
+      "why",
+      "show",
+      "tell",
+      "is",
+      "are",
+      "was",
+      "were",
+      "the",
+      "a",
+      "an",
+      "in",
+      "of",
+      "all",
+      "to",
+      "for",
+      "from",
+      "on",
+      "at",
+      "defined",
+      "definition",
+      "constructed",
+      "constructor",
+      "created",
+      "located",
+      "used",
+      "usage",
+      "usages",
+      "referenced",
+      "references",
+      "reference",
+      "called",
+      "calls",
+      "invoked",
+      "invocations",
+      "instantiated",
+      "instantiation",
+    ]);
+
+    return Boolean(
+      identifiers?.some(
+        (identifier) => !ignoredWords.has(identifier.toLowerCase()),
+      ),
+    );
   }
 
   /*
