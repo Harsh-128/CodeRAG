@@ -778,9 +778,20 @@ export function getRepositoryInventoryQuestionType(
     .replace(/[^a-z0-9_$]+/g, " ")
     .trim();
 
+  if (/\b(inside|within)\s+[a-z0-9_./-]+/.test(normalized)) {
+    if (/\b(functions?|methods?|symbols?|classes?)\b/.test(normalized)) {
+      return "symbols";
+    }
+
+    if (/\b(files?|file)\b/.test(normalized)) {
+      return "directory_contents";
+    }
+  }
+
   if (/\b(files?|file)\b/.test(normalized)) {
     return "files";
   }
+
   if (
     /\b(main\s+modules?|main\s+directories?|module\s+overview)\b/.test(
       normalized,
@@ -797,16 +808,13 @@ export function getRepositoryInventoryQuestionType(
     return "directories";
   }
 
-  if (/\b(inside|within)\s+[a-z0-9_./-]+/.test(normalized)) {
-    return "directory_contents";
-  }
-
   if (/\b(functions?|methods?|symbols?|classes?)\b/.test(normalized)) {
     return "symbols";
   }
 
   return "overview";
 }
+
 export function extractRepositoryDirectory(question: string): string | null {
   const normalized = question
     .toLowerCase()
