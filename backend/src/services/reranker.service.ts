@@ -283,6 +283,79 @@ if (
 
     /*
      * ---------------------------------------------------------
+     * Symbol-navigation questions
+     * ---------------------------------------------------------
+     *
+     * Prefer exact symbol matches and concrete implementations
+     * over loosely related semantic results.
+     */
+
+    const symbolNavigationQuery =
+      queryIntent === "symbol-navigation" ||
+      (queryIntent === undefined &&
+        /\b(where is|where are|find|locate|show me|what does|what is)\b/.test(
+          normalizedQuery,
+        ) &&
+        /\b(symbol|function|method|class|implementation|defined|used|usage)\b/.test(
+          normalizedQuery,
+        ));
+
+    if (symbolNavigationQuery) {
+      if (symbolName) {
+        for (const term of queryTerms) {
+          if (symbolName === term) {
+            bonus += 0.20;
+          }
+        }
+      }
+
+      const declarationSymbol =
+        symbolType === "class_declaration" ||
+        symbolType === "class_definition" ||
+        symbolType === "interface_declaration" ||
+        symbolType === "enum_declaration" ||
+        symbolType === "record_declaration" ||
+        symbolType === "type_declaration";
+
+      const implementationSymbol =
+        symbolType === "method_definition" ||
+        symbolType === "method_declaration" ||
+        symbolType === "function_definition" ||
+        symbolType === "function_declaration";
+
+      if (implementationSymbol) {
+        bonus += 0.10;
+      }
+
+      if (declarationSymbol) {
+        bonus += 0.06;
+      }
+
+      if (
+        normalizedQuery.includes("implementation") &&
+        implementationSymbol
+      ) {
+        bonus += 0.12;
+      }
+
+      if (
+        normalizedQuery.includes("defined") &&
+        declarationSymbol
+      ) {
+        bonus += 0.12;
+      }
+
+      if (
+        /\\b(used|usage|called|calls)\\b/.test(normalizedQuery) &&
+        !declarationSymbol &&
+        !implementationSymbol
+      ) {
+        bonus += 0.08;
+      }
+    }
+
+    /*
+     * ---------------------------------------------------------
      * Java-specific method/constructor signals
      * ---------------------------------------------------------
      */
