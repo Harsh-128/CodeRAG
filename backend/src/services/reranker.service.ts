@@ -263,8 +263,10 @@ if (
      */
 
     const declarationQuery =
-      /\b(class|interface|enum|record|type|struct|definition|defined)\b/
-        .test(normalizedQuery);
+      queryIntent === "declaration" ||
+      (queryIntent === undefined &&
+        /\b(class|interface|enum|record|type|struct|definition|defined)\b/
+          .test(normalizedQuery));
 
     if (declarationQuery) {
       if (
