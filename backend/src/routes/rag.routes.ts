@@ -2,6 +2,7 @@ import { FastifyInstance } from "fastify";
 import { hybridSearchCode } from "../services/search.service.js";
 import { buildContext } from "../services/context.service.js";
 import { generateAnswer } from "../services/llm.service.js";
+import { detectQueryIntent } from "../services/query-intent.service.js";
 import {
   lookupSymbolsForQuestion,
   isSymbolNavigationQuestion,
@@ -55,6 +56,7 @@ export async function ragRoutes(app: FastifyInstance) {
     }
 
     const question = body.question.trim();
+    const queryIntent = detectQueryIntent(question);
     const repositoryName = body.repository?.trim();
     const language = body.language?.trim();
 
@@ -226,7 +228,8 @@ export async function ragRoutes(app: FastifyInstance) {
       if (
         repositoryName &&
         !language &&
-        isRepositoryInventoryQuestion(question)
+        (isRepositoryInventoryQuestion(question) ||
+          queryIntent === "repository-inventory")
       ) {
         const inventory = await getRepositorySymbolInventory(repositoryName);
         const inventoryType = getRepositoryInventoryQuestionType(question);
@@ -410,12 +413,13 @@ export async function ragRoutes(app: FastifyInstance) {
         }));
 
       return {
-        question,
-        repository: repositoryName ?? null,
-        answer,
-        sources,
-        mode: "rag",
-      };
+          question,
+          repository: repositoryName ?? null,
+          answer,
+          sources,
+          mode: "rag",
+          intent: queryIntent,
+        };
     } catch (error) {
       app.log.error(error);
 
