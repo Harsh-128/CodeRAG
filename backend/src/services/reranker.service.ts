@@ -232,8 +232,10 @@ if (
      */
 
     const constructorQuery =
-      /\b(construct|constructed|constructor|instantiate|instantiated|instance|create|created|new)\b/
-        .test(normalizedQuery);
+      queryIntent === "constructor" ||
+      (queryIntent === undefined &&
+        /\b(construct|constructed|constructor|instantiate|instantiated|instance|create|created|new)\b/
+          .test(normalizedQuery));
 
     if (constructorQuery) {
       if (

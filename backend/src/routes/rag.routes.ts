@@ -69,7 +69,11 @@ export async function ragRoutes(app: FastifyInstance) {
         repositoryName,
         language,
       );
-      if (isSymbolNavigationQuestion(question) && symbolResults.length === 0) {
+      if (
+          isSymbolNavigationQuestion(question) &&
+          queryIntent === "symbol-navigation" &&
+          symbolResults.length === 0
+        ) {
         return {
           question,
           repository: repositoryName ?? null,
@@ -81,7 +85,7 @@ export async function ragRoutes(app: FastifyInstance) {
       /*
        * 2. Symbol/navigation path
        */
-      if (symbolResults.length > 0) {
+      if (queryIntent === "symbol-navigation" && symbolResults.length > 0) {
         const fileScopedSymbolQuestion =
           /\b(?:inside|within|in)\s+[A-Za-z0-9_./-]+\.[A-Za-z0-9]+\b/i.test(
             question,
