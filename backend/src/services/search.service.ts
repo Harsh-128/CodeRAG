@@ -136,6 +136,7 @@ export async function hybridSearchCode(
   repositoryName?: string,
   language?: string,
   broadRepositoryQuestion = false,
+  queryIntent?: string,
 ): Promise<SearchResult[]> {
   // First get a larger semantic candidate set.
   const semanticResults = await searchCode(query, 50, repositoryName, language);
@@ -171,9 +172,11 @@ export async function hybridSearchCode(
    * symbols instead of unrelated examples.
    */
   const requestFlowQuestion =
+  queryIntent === "request-flow" ||
+  (queryIntent === undefined &&
     /\b(handle|handles|handling|request|requests|middleware|response|responses|dispatch|dispatches|route|routing)\b/i.test(
       query,
-    );
+    ));
 
   const requestFlowTerms = [
     "handle",

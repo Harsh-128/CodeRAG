@@ -382,6 +382,7 @@ export async function ragRoutes(app: FastifyInstance) {
         repositoryName,
         language,
         broadRepositoryQuestion,
+        queryIntent,
       );
 
       /*
