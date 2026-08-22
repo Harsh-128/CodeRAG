@@ -50,3 +50,24 @@ test("falls back to general", () => {
     "general",
   );
 });
+
+test("does not let class keyword override request-flow intent", () => {
+  assert.equal(
+    detectQueryIntent("How does the UserService class handle requests?"),
+    "request-flow",
+  );
+});
+
+test("does not let class keyword override method intent", () => {
+  assert.equal(
+    detectQueryIntent("Which method in the UserService class fetches users?"),
+    "method",
+  );
+});
+
+test("does not let class keyword override constructor intent", () => {
+  assert.equal(
+    detectQueryIntent("How is the UserService class constructed?"),
+    "constructor",
+  );
+});
