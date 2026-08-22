@@ -270,5 +270,11 @@ export async function hybridSearchCode(
     };
   });
 
-  return rerankResults(query, rankedResults, limit, broadRepositoryQuestion);
+  return rerankResults(
+  query,
+  rankedResults,
+  limit,
+  broadRepositoryQuestion,
+  queryIntent,
+);
 }

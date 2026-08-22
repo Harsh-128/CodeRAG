@@ -24,6 +24,9 @@ if (
   ) &&
   /\b(symbol|function|method|class|implementation|defined|used|usage)\b/.test(
     normalized,
+  ) &&
+  !/\b(do|does|return|returns|get|gets|fetch|fetches|retrieve|retrieves|find|finds|calculate|calculates|call|calls|handle|handles|process|processes)\b/.test(
+    normalized,
   )
 ) {
   return "symbol-navigation";
@@ -46,7 +49,7 @@ if (
   }
 
   if (
-    /\b(method|function|return|returns|get|gets|fetch|fetches|retrieve|retrieves|find|finds|calculate|calculates|call|calls|handle|handles|process|processes)\b/.test(
+    /\b(method|function|return|returns|get|gets|fetch|fetches|retrieve|retrieves|find|finds|calculate|calculates|call|calls)\b/.test(
       normalized,
     )
   ) {
@@ -54,12 +57,20 @@ if (
   }
 
   if (
-    /\b(construct|constructed|constructor|instantiate|instantiated|instance|created|create|new)\b/.test(
+    /\b(handle|handles|process|processes)\b/.test(normalized) &&
+    !/\b(request|requests|response|responses|middleware|route|routing|dispatch)\b/.test(
       normalized,
     )
   ) {
-    return "constructor";
-  }
+      return "method";
+    }
+    if (
+      /\b(construct|constructed|constructor|instantiate|instantiated|instance|created|create|new)\b/.test(
+        normalized,
+      )
+    ) {
+      return "constructor";
+    }
 
   if (
     /\b(class|interface|enum|record|type|struct|definition|defined)\b/.test(

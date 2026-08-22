@@ -23,6 +23,13 @@ test("detects method questions", () => {
   );
 });
 
+test("detects handle as a method when it is not request flow", () => {
+  assert.equal(
+    detectQueryIntent("What does the handle function do?"),
+    "method",
+  );
+});
+
 test("detects constructor questions", () => {
   assert.equal(
     detectQueryIntent("Where is UserService instantiated?"),

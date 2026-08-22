@@ -53,7 +53,8 @@ export function rerankResults(
   query: string,
   results: SearchResult[],
   limit = 5,
-  broadRepositoryQuestion = false
+  broadRepositoryQuestion = false,
+  queryIntent?: string
 ): SearchResult[] {
   const normalizedQuery = normalize(query);
   const queryTerms = getQueryTerms(query);
@@ -172,8 +173,10 @@ if (
      */
 
     const methodQuery =
-      /\b(return|returns|get|gets|fetch|fetches|retrieve|retrieves|find|finds|calculate|calculates|handle|handles|process|processes|call|calls|method|function)\b/
-        .test(normalizedQuery);
+      queryIntent === "method" ||
+      (queryIntent === undefined &&
+        /\b(return|returns|get|gets|fetch|fetches|retrieve|retrieves|find|finds|calculate|calculates|handle|handles|process|processes|call|calls|method|function)\b/
+          .test(normalizedQuery));
 
     if (methodQuery) {
       const isMethod =
