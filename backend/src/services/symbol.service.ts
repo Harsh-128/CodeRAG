@@ -52,15 +52,34 @@ export async function findSymbol(
   const normalizedSymbolName = symbolName.toLowerCase();
 
   return response.points
-    .map((point) => ({
-      id: point.id,
-      payload: point.payload as SymbolSearchResult["payload"],
-    }))
-    .filter(
-      (result) =>
-        result.payload.symbolName?.toLowerCase() === normalizedSymbolName,
-    )
-    .slice(0, limit);
+  .map((point) => ({
+    id: point.id,
+    payload: point.payload as SymbolSearchResult["payload"],
+  }))
+  .filter(
+    (result) =>
+      result.payload.symbolName?.toLowerCase() === normalizedSymbolName,
+  )
+  .sort((a, b) => {
+    const implementationTypes = new Set([
+      "method_definition",
+      "function_definition",
+      "method_declaration",
+      "function_declaration",
+    ]);
+
+    const aType = a.payload.symbolType?.toLowerCase() ?? "";
+    const bType = b.payload.symbolType?.toLowerCase() ?? "";
+
+    const aIsImplementation = implementationTypes.has(aType);
+    const bIsImplementation = implementationTypes.has(bType);
+
+    if (aIsImplementation && !bIsImplementation) return -1;
+    if (!aIsImplementation && bIsImplementation) return 1;
+
+    return a.payload.startLine - b.payload.startLine;
+  })
+  .slice(0, limit);
 }
 
 export async function findSymbolsByParent(
@@ -322,6 +341,21 @@ export function isSymbolNavigationQuestion(question: string): boolean {
     .toLowerCase()
     .replace(/[^a-z0-9_$]+/g, " ")
     .trim();
+  
+  /*
+   * Constructor questions are handled by the constructor
+   * intent / normal RAG flow unless they explicitly ask
+   * where an instance is created.
+   */
+  const isConstructorQuestion =
+    /\bconstructor\b/.test(normalized);
+
+  if (
+    isConstructorQuestion &&
+    !/\b(instantiated|instantiation|created|constructed)\b/.test(normalized)
+  ) {
+    return false;
+  }
 
   /*
    * Direct navigation keywords.
@@ -330,9 +364,9 @@ export function isSymbolNavigationQuestion(question: string): boolean {
    * symbol is defined, used, called, etc.
    */
   const directNavigation =
-    /\b(defined|definition|constructed|constructor|created|located|used|usage|usages|referenced|references|reference|called|calls|invoked|invocations|instantiated|instantiation)\b/.test(
-      normalized,
-    );
+  /\b(defined|definition|created|located|used|usage|usages|referenced|references|reference|called|calls|invoked|invocations|instantiated|instantiation)\b/.test(
+    normalized,
+  );
 
   const hasExplicitSymbol = /`[A-Za-z_$][A-Za-z0-9_$]*`/.test(question);
 
@@ -414,6 +448,7 @@ export function isSymbolNavigationQuestion(question: string): boolean {
   const explanatoryNavigation =
     /\b(does|work)\b/.test(normalized) &&
     /\b(method|function|class)\b/.test(normalized);
+    
 
   if (explanatoryNavigation) {
     const identifiers = question.match(/\b[A-Za-z_$][A-Za-z0-9_$]*\b/g);
@@ -438,6 +473,20 @@ export function isSymbolNavigationQuestion(question: string): boolean {
     );
 
     return Boolean(hasSymbol);
+  }
+    /*
+   * "What does X return?"
+   *
+   * This is asking about the behavior of a specific symbol,
+   * so it should use symbol navigation.
+   */
+  const returnNavigation =
+    /\bwhat\s+does\s+[A-Za-z_$][A-Za-z0-9_$]*\s+return\b/i.test(
+      question,
+    );
+
+  if (returnNavigation) {
+    return true;
   }
 
   return false;
