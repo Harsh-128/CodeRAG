@@ -130,6 +130,7 @@ async function searchLexicalCandidates(
 
   return candidates;
 }
+
 export async function hybridSearchCode(
   query: string,
   limit = 5,
@@ -139,7 +140,12 @@ export async function hybridSearchCode(
   queryIntent?: string,
 ): Promise<SearchResult[]> {
   // First get a larger semantic candidate set.
-  const semanticResults = await searchCode(query, 50, repositoryName, language);
+  const semanticResults = await searchCode(
+    query,
+    50,
+    repositoryName,
+    language,
+  );
 
   const lexicalResults = await searchLexicalCandidates(
     query,
@@ -156,38 +162,12 @@ export async function hybridSearchCode(
           other.payload.endLine === result.payload.endLine,
       ) === index,
   );
+
   // Normalize the user's query into searchable terms.
   const queryTerms = query
     .toLowerCase()
     .split(/[^a-zA-Z0-9_]+/)
     .filter((term) => term.length > 1);
-
-  /*
-   * Request-flow questions need stronger lexical signals.
-   *
-   * Example:
-   *   How does Express handle a request?
-   *
-   * Prefer chunks containing the actual request lifecycle
-   * symbols instead of unrelated examples.
-   */
-  const requestFlowQuestion =
-  queryIntent === "request-flow" ||
-  (queryIntent === undefined &&
-    /\b(handle|handles|handling|request|requests|middleware|response|responses|dispatch|dispatches|route|routing)\b/i.test(
-      query,
-    ));
-
-  const requestFlowTerms = [
-    "handle",
-    "request",
-    "req",
-    "res",
-    "next",
-    "dispatch",
-    "middleware",
-    "route",
-  ];
 
   const rankedResults = mergedResults.map((result) => {
     const content = result.payload.content.toLowerCase();
@@ -195,36 +175,6 @@ export async function hybridSearchCode(
     const filePath = result.payload.filePath.toLowerCase();
 
     let lexicalScore = 0;
-    if (requestFlowQuestion) {
-      for (const term of requestFlowTerms) {
-        if (content.includes(term)) {
-          lexicalScore += 0.1;
-        }
-
-        if (symbolName === term) {
-          lexicalScore += 0.3;
-        }
-      }
-
-      /*
-       * Strong signal for Express-style request dispatch.
-       */
-      if (
-        content.includes("app.handle") ||
-        content.includes("handle(req, res") ||
-        content.includes("req, res, next")
-      ) {
-        lexicalScore += 0.35;
-      }
-
-      /*
-       * Prefer actual application/library implementation
-       * over examples and tests for request-flow questions.
-       */
-      if (filePath.startsWith("lib/") && !filePath.startsWith("test/")) {
-        lexicalScore += 0.15;
-      }
-    }
 
     for (const term of queryTerms) {
       if (content.includes(term)) {
@@ -240,29 +190,8 @@ export async function hybridSearchCode(
       }
     }
 
-    let hybridScore = result.score * 0.75 + Math.min(lexicalScore, 1) * 0.25;
-
-    if (requestFlowQuestion) {
-      if (
-        content.includes("app.handle") ||
-        content.includes("handle(req, res") ||
-        content.includes("req, res, next")
-      ) {
-        hybridScore += 0.35;
-      }
-
-      if (symbolName === "handle" || symbolName === "createapplication") {
-        hybridScore += 0.25;
-      }
-
-      if (filePath === "lib/application.js" || filePath === "lib/express.js") {
-        hybridScore += 0.2;
-      }
-
-      if (filePath.startsWith("examples/") || filePath.startsWith("test/")) {
-        hybridScore -= 0.15;
-      }
-    }
+    const hybridScore =
+      result.score * 0.75 + Math.min(lexicalScore, 1) * 0.25;
 
     return {
       ...result,
@@ -271,10 +200,10 @@ export async function hybridSearchCode(
   });
 
   return rerankResults(
-  query,
-  rankedResults,
-  limit,
-  broadRepositoryQuestion,
-  queryIntent,
-);
+    query,
+    rankedResults,
+    limit,
+    broadRepositoryQuestion,
+    queryIntent,
+  );
 }

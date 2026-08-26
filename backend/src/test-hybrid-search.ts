@@ -1,11 +1,21 @@
 import { hybridSearchCode } from "./services/search.service.js";
+import { detectQueryIntent } from "./services/query-intent.service.js";
 
 async function main() {
-  const query = "How does Express handle rendering errors?";
+  const query = "How does Express handle a request?";
 
   console.log(`Hybrid search: "${query}"\n`);
 
-  const results = await hybridSearchCode(query, 5);
+  const queryIntent = detectQueryIntent(query);
+
+  const results = await hybridSearchCode(
+    query,
+    5,
+    undefined,
+    undefined,
+    false,
+    queryIntent,
+  );
 
   for (const [index, result] of results.entries()) {
     console.log(`Result #${index + 1}`);
