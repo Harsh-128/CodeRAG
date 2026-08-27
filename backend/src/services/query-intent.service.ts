@@ -22,30 +22,41 @@ export function detectQueryIntent(query: string): QueryIntent {
   }
 
   /*
-   * Questions asking which methods/functions belong
-   * to a class are symbol-navigation questions.
-   *
-   * Example:
-   *   Which methods belong to UserService?
-   */
-  if (
-    /\b(which|what)\s+(methods?|functions?)\s+(belong\s+to|of)\b/.test(
-      normalized,
-    )
-  ) {
-    return "symbol-navigation";
-  }
+ * Questions asking which methods/functions belong
+ * to a class are symbol-navigation questions.
+ *
+ * Example:
+ *   Which methods belong to UserService?
+ */
+if (
+  /\b(which|what)\s+(methods?|functions?)\s+(belong\s+to|of)\b/.test(
+    normalized,
+  )
+) {
+  return "symbol-navigation";
+}
 
-  /*
-   * Explanatory symbol questions remain method questions.
-   */
-  if (
-    /\b(method|function|return|returns|get|gets|fetch|fetches|retrieve|retrieves|find|finds|calculate|calculates|call|calls)\b/.test(
-      normalized,
-    )
-  ) {
-    return "method";
-  }
+/*
+ * Explicit symbol-navigation questions asking where
+ * a symbol or class is defined.
+ */
+if (
+  /\b(where is|where are|find|locate|show me)\b/.test(normalized) &&
+  /\b(defined|definition)\b/.test(normalized)
+) {
+  return "symbol-navigation";
+}
+
+/*
+ * Explanatory symbol questions remain method questions.
+ */
+if (
+  /\b(method|function|return|returns|get|gets|fetch|fetches|retrieve|retrieves|find|finds|calculate|calculates|call|calls)\b/.test(
+    normalized,
+  )
+) {
+  return "method";
+}
 
   if (
     /\b(handle|handles|process|processes)\b/.test(normalized) &&
@@ -118,7 +129,7 @@ export function detectQueryIntent(query: string): QueryIntent {
     return "symbol-navigation";
   }
 
-  /*
+    /*
    * Repository questions.
    */
   if (
@@ -127,6 +138,19 @@ export function detectQueryIntent(query: string): QueryIntent {
     )
   ) {
     return "repository-inventory";
+  }
+
+  /*
+   * Questions asking what a specific symbol does.
+   *
+   * Examples:
+   *   What does calculate_total do?
+   *   What does hello do?
+   */
+  if (
+    /\bwhat\s+does\s+[A-Za-z_$][A-Za-z0-9_$]*\s+(do|work)\b/i.test(query)
+  ) {
+    return "method";
   }
 
   return "general";

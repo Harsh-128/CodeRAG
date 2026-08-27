@@ -126,6 +126,14 @@ async function main() {
 
   for (const evaluationCase of evaluationCases) {
     const predictedIntent = detectQueryIntent(evaluationCase.question);
+    if (
+      evaluationCase.expectedIntent &&
+      predictedIntent !== evaluationCase.expectedIntent
+    ) {
+      console.log(
+        `  INTENT MISMATCH: expected ${evaluationCase.expectedIntent}, got ${predictedIntent}`,
+      );
+    }
 
     if (
       evaluationCase.expectedIntent &&
