@@ -12,15 +12,10 @@ function getQueryTerms(query: string): string[] {
     .split(/\s+/)
     .filter((term) => term.length > 1);
 }
-function detectQueryLanguage(
-  query: string
-): string | null {
+function detectQueryLanguage(query: string): string | null {
   const normalizedQuery = normalize(query);
 
-  const languageAliases: Record<
-    string,
-    string
-  > = {
+  const languageAliases: Record<string, string> = {
     javascript: "javascript",
     js: "javascript",
 
@@ -54,27 +49,22 @@ export function rerankResults(
   results: SearchResult[],
   limit = 5,
   broadRepositoryQuestion = false,
-  queryIntent?: string
+  queryIntent?: string,
 ): SearchResult[] {
   const normalizedQuery = normalize(query);
   const queryTerms = getQueryTerms(query);
   const queryLanguage = detectQueryLanguage(query);
 
   const reranked = results.map((result) => {
-    const content =
-      result.payload.content?.toLowerCase() ?? "";
+    const content = result.payload.content?.toLowerCase() ?? "";
 
-    const symbolName =
-      result.payload.symbolName?.toLowerCase() ?? "";
+    const symbolName = result.payload.symbolName?.toLowerCase() ?? "";
 
-    const parentName =
-      result.payload.parentName?.toLowerCase() ?? "";
+    const parentName = result.payload.parentName?.toLowerCase() ?? "";
 
-    const filePath =
-      result.payload.filePath?.toLowerCase() ?? "";
+    const filePath = result.payload.filePath?.toLowerCase() ?? "";
 
-    const symbolType =
-      result.payload.symbolType?.toLowerCase() ?? "";
+    const symbolType = result.payload.symbolType?.toLowerCase() ?? "";
 
     let bonus = 0;
 
@@ -116,17 +106,11 @@ export function rerankResults(
         bonus += 0.25;
       }
 
-      if (
-        filePath === "lib/application.js" ||
-        filePath === "lib/express.js"
-      ) {
+      if (filePath === "lib/application.js" || filePath === "lib/express.js") {
         bonus += 0.2;
       }
 
-      if (
-        filePath.startsWith("examples/") ||
-        filePath.startsWith("test/")
-      ) {
+      if (filePath.startsWith("examples/") || filePath.startsWith("test/")) {
         bonus -= 0.15;
       }
     }
@@ -157,21 +141,20 @@ export function rerankResults(
     }
 
     /*
- * ---------------------------------------------------------
- * Explicit language matching
- * ---------------------------------------------------------
- *
- * Only boost a language when the user explicitly
- * mentions it in the question.
- */
+     * ---------------------------------------------------------
+     * Explicit language matching
+     * ---------------------------------------------------------
+     *
+     * Only boost a language when the user explicitly
+     * mentions it in the question.
+     */
 
-if (
-  queryLanguage &&
-  result.payload.language.toLowerCase() ===
-    queryLanguage
-) {
-  bonus += 0.20;
-}
+    if (
+      queryLanguage &&
+      result.payload.language.toLowerCase() === queryLanguage
+    ) {
+      bonus += 0.2;
+    }
 
     /*
      * ---------------------------------------------------------
@@ -195,17 +178,11 @@ if (
      */
 
     for (const term of queryTerms) {
-      if (
-        symbolName === term ||
-        symbolName.includes(term)
-      ) {
+      if (symbolName === term || symbolName.includes(term)) {
         bonus += 0.12;
       }
 
-      if (
-        parentName === term ||
-        parentName.includes(term)
-      ) {
+      if (parentName === term || parentName.includes(term)) {
         bonus += 0.04;
       }
 
@@ -229,8 +206,9 @@ if (
     const methodQuery =
       queryIntent === "method" ||
       (queryIntent === undefined &&
-        /\b(return|returns|get|gets|fetch|fetches|retrieve|retrieves|find|finds|calculate|calculates|handle|handles|process|processes|call|calls|method|function)\b/
-          .test(normalizedQuery));
+        /\b(return|returns|get|gets|fetch|fetches|retrieve|retrieves|find|finds|calculate|calculates|handle|handles|process|processes|call|calls|method|function)\b/.test(
+          normalizedQuery,
+        ));
 
     if (methodQuery) {
       const isMethod =
@@ -242,7 +220,7 @@ if (
       if (isMethod) {
         bonus += 0.08;
       }
-            /*
+      /*
        * "Which method..." questions should strongly prefer
        * actual methods/functions over classes, constructors,
        * and test entry points.
@@ -251,22 +229,19 @@ if (
         bonus += 0.35;
       }
       /*
-        * "Which method..." questions should prefer the actual
-        * domain method over test/entry-point methods such as main().
-        */
-        if (
-          /\bwhich\s+method\b/.test(normalizedQuery) &&
-          isMethod &&
-          symbolName === "main"
-        ) {
-          bonus -= 0.25;
-        }
-
+       * "Which method..." questions should prefer the actual
+       * domain method over test/entry-point methods such as main().
+       */
       if (
-        /\b(fetch|retrieve|find)\b/.test(normalizedQuery) &&
-        isMethod
+        /\bwhich\s+method\b/.test(normalizedQuery) &&
+        isMethod &&
+        symbolName === "main"
       ) {
-        bonus += 0.10;
+        bonus -= 0.25;
+      }
+
+      if (/\b(fetch|retrieve|find)\b/.test(normalizedQuery) && isMethod) {
+        bonus += 0.1;
       }
 
       // Strongly prefer methods/functions whose implementation
@@ -314,8 +289,9 @@ if (
     const constructorQuery =
       queryIntent === "constructor" ||
       (queryIntent === undefined &&
-        /\b(construct|constructed|constructor|instantiate|instantiated|instance|create|created|new)\b/
-          .test(normalizedQuery));
+        /\b(construct|constructed|constructor|instantiate|instantiated|instance|create|created|new)\b/.test(
+          normalizedQuery,
+        ));
 
     if (constructorQuery) {
       if (
@@ -334,6 +310,46 @@ if (
       ) {
         bonus += 0.05;
       }
+      /*
+       * Creation/instantiation questions should prefer
+       * the actual call site where the object is created.
+       */
+
+      const creationTarget = normalizedQuery.match(
+        /\b(?:where\s+is|where\s+are)\s+([a-z_$][a-z0-9_$]*)\s+(?:created|create|instantiated|instantiate)\b/i,
+      )?.[1];
+
+      if (
+        creationTarget &&
+        new RegExp(`\\bnew\\s+${creationTarget}\\s*\\(`, "i").test(content)
+      ) {
+        bonus += 0.3;
+
+        const isContainer =
+          symbolType === "class_declaration" ||
+          symbolType === "class_definition" ||
+          symbolType === "interface_declaration" ||
+          symbolType === "interface_definition" ||
+          symbolType === "enum_declaration" ||
+          symbolType === "enum_definition" ||
+          symbolType === "record_declaration" ||
+          symbolType === "record_definition";
+
+        const isImplementation =
+          symbolType === "method_declaration" ||
+          symbolType === "method_definition" ||
+          symbolType === "function_declaration" ||
+          symbolType === "function_definition";
+
+        // Prefer the actual call site over its enclosing class.
+        if (isImplementation) {
+          bonus += 0.3;
+        }
+
+        if (isContainer) {
+          bonus -= 0.15;
+        }
+      }
     }
 
     /*
@@ -345,8 +361,9 @@ if (
     const declarationQuery =
       queryIntent === "declaration" ||
       (queryIntent === undefined &&
-        /\b(class|interface|enum|record|type|struct|definition|defined)\b/
-          .test(normalizedQuery));
+        /\b(class|interface|enum|record|type|struct|definition|defined)\b/.test(
+          normalizedQuery,
+        ));
 
     if (declarationQuery) {
       if (
@@ -384,7 +401,7 @@ if (
       if (symbolName) {
         for (const term of queryTerms) {
           if (symbolName === term) {
-            bonus += 0.20;
+            bonus += 0.2;
           }
         }
       }
@@ -404,24 +421,18 @@ if (
         symbolType === "function_declaration";
 
       if (implementationSymbol) {
-        bonus += 0.10;
+        bonus += 0.1;
       }
 
       if (declarationSymbol) {
         bonus += 0.06;
       }
 
-      if (
-        normalizedQuery.includes("implementation") &&
-        implementationSymbol
-      ) {
+      if (normalizedQuery.includes("implementation") && implementationSymbol) {
         bonus += 0.12;
       }
 
-      if (
-        normalizedQuery.includes("defined") &&
-        declarationSymbol
-      ) {
+      if (normalizedQuery.includes("defined") && declarationSymbol) {
         bonus += 0.12;
       }
 
@@ -442,7 +453,7 @@ if (
 
     if (symbolType === "constructor_declaration") {
       if (constructorQuery) {
-        bonus += 0.10;
+        bonus += 0.1;
       }
 
       if (methodQuery && !constructorQuery) {
@@ -450,10 +461,7 @@ if (
       }
     }
 
-    if (
-      symbolType === "method_declaration" &&
-      methodQuery
-    ) {
+    if (symbolType === "method_declaration" && methodQuery) {
       bonus += 0.05;
     }
 
@@ -490,8 +498,7 @@ if (
      */
 
     const errorQuery =
-      normalizedQuery.includes("error") ||
-      normalizedQuery.includes("errors");
+      normalizedQuery.includes("error") || normalizedQuery.includes("errors");
 
     if (errorQuery) {
       if (
@@ -504,37 +511,36 @@ if (
       }
     }
 
-return {
-  ...result,
-  score: result.score + bonus,
-};
+    return {
+      ...result,
+      score: result.score + bonus,
+    };
   });
 
-  const sortedResults = reranked
-  .sort((a, b) => b.score - a.score);
+  const sortedResults = reranked.sort((a, b) => b.score - a.score);
 
-const selected: SearchResult[] = [];
-const seenSymbols = new Set<string>();
+  const selected: SearchResult[] = [];
+  const seenSymbols = new Set<string>();
 
-for (const result of sortedResults) {
-  const symbolKey = [
-    result.payload.filePath,
-    result.payload.symbolName ?? "",
-    result.payload.startLine,
-    result.payload.endLine,
-  ].join(":");
+  for (const result of sortedResults) {
+    const symbolKey = [
+      result.payload.filePath,
+      result.payload.symbolName ?? "",
+      result.payload.startLine,
+      result.payload.endLine,
+    ].join(":");
 
-  if (seenSymbols.has(symbolKey)) {
-    continue;
+    if (seenSymbols.has(symbolKey)) {
+      continue;
+    }
+
+    seenSymbols.add(symbolKey);
+    selected.push(result);
+
+    if (selected.length >= limit) {
+      break;
+    }
   }
 
-  seenSymbols.add(symbolKey);
-  selected.push(result);
-
-  if (selected.length >= limit) {
-    break;
-  }
-}
-
-return selected;
+  return selected;
 }

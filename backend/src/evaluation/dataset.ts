@@ -295,7 +295,7 @@ export const evaluationCases: EvaluationCase[] = [
     question: "What does calculate_total do?",
     repository: "multilang",
     expectedIntent: "method",
-    expectedPath: "rag",
+    expectedPath: "symbol-navigation",
     expectedResults: [
       {
         file: "main.py",
@@ -314,6 +314,149 @@ export const evaluationCases: EvaluationCase[] = [
       {
         file: "main.py",
         symbol: "add",
+      },
+    ],
+  },
+
+  {
+    id: "hello-work",
+    question: "What does the hello function work?",
+    repository: "multilang",
+    language: "javascript",
+    expectedIntent: "method",
+    expectedPath: "symbol-navigation",
+    expectedResults: [
+      {
+        file: "App.js",
+        symbol: "hello",
+      },
+    ],
+  },
+
+  {
+    id: "getname-implementation",
+    question: "Where is the getName method implemented?",
+    repository: "multilang",
+    language: "typescript",
+    expectedIntent: "symbol-navigation",
+    expectedPath: "symbol-navigation",
+    expectedResults: [
+      {
+        file: "UserService.ts",
+        symbol: "getName",
+      },
+    ],
+  },
+
+  {
+    id: "userservice-definition-short",
+    question: "Where is UserService defined?",
+    repository: "multilang",
+    language: "typescript",
+    expectedIntent: "symbol-navigation",
+    expectedPath: "symbol-navigation",
+    expectedResults: [
+      {
+        file: "UserService.ts",
+        symbol: "UserService",
+      },
+    ],
+  },
+
+  {
+    id: "getname-invoked",
+    question: "Where is getName invoked?",
+    repository: "multilang",
+    language: "typescript",
+    expectedIntent: "symbol-navigation",
+    expectedPath: "symbol-navigation",
+    expectedResults: [
+      {
+        file: "UserServiceTest.java",
+      },
+    ],
+  },
+
+  {
+    id: "userservice-referenced",
+    question: "Where is UserService referenced?",
+    repository: "multilang",
+    expectedIntent: "symbol-navigation",
+    expectedPath: "symbol-navigation",
+    expectedResults: [
+      {
+        file: "UserServiceTest.java",
+      },
+    ],
+  },
+
+  {
+    id: "calculator-add-definition",
+    question: "Where is the add function defined?",
+    repository: "multilang",
+    expectedIntent: "symbol-navigation",
+    expectedPath: "symbol-navigation",
+    expectedResults: [
+      {
+        file: "main.py",
+        symbol: "add",
+      },
+    ],
+  },
+
+  {
+    id: "calculator-add-do",
+    question: "What does add do?",
+    repository: "multilang",
+    expectedIntent: "method",
+    expectedPath: "symbol-navigation",
+    expectedResults: [
+      {
+        file: "main.py",
+        symbol: "add",
+      },
+    ],
+  },
+
+  {
+    id: "calculator-method-list",
+    question: "What methods belong to Calculator?",
+    repository: "multilang",
+    expectedIntent: "symbol-navigation",
+    expectedPath: "symbol-navigation",
+    expectedResults: [
+      {
+        file: "main.py",
+        symbol: "add",
+      },
+    ],
+  },
+
+  {
+    id: "getname-what-work",
+    question: "What does getName work?",
+    repository: "multilang",
+    language: "typescript",
+    expectedIntent: "method",
+    expectedPath: "symbol-navigation",
+    expectedResults: [
+      {
+        file: "UserService.ts",
+        symbol: "getName",
+      },
+    ],
+  },
+
+  {
+    id: "user-service-created",
+    question: "Where is UserService created?",
+    repository: "multilang",
+    expectedIntent: "constructor",
+    expectedPath: "rag",
+    expectedResults: [
+      {
+        file: "UserServiceTest.java",
+        symbol: "main",
       },
     ],
   },

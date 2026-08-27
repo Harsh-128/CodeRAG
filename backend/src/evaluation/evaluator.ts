@@ -33,37 +33,12 @@ async function retrieveForEvaluation(
   );
 
   /*
-   * /api/ask enters the symbol-navigation response path
-   * when the query is classified as symbol-navigation
-   * and symbol results exist.
-   */
-  if (
-    queryIntent === "symbol-navigation" &&
-    symbolResults.length > 0
-  ) {
-    return {
-      path: "symbol-navigation",
-      results: symbolResults.slice(0, TOP_K).map((result) => ({
-        file: result.payload.filePath,
-        symbol: result.payload.symbolName ?? null,
-      })),
-    };
-  }
-
-  /*
-   * lookupSymbolsForQuestion() also handles specialized
-   * symbol questions such as:
-   *   "What does X do?"
-   *   "Where is X called?"
-   *   "Which methods belong to X?"
-   *
-   * These can have a non-symbol-navigation queryIntent,
-   * but the production route still uses their symbol results
-   * in the appropriate specialized flow.
+   * Mirror /api/ask symbol-navigation routing.
    */
   if (
     symbolResults.length > 0 &&
-    isSymbolNavigationQuestion(question)
+    (queryIntent === "symbol-navigation" ||
+      isSymbolNavigationQuestion(question))
   ) {
     return {
       path: "symbol-navigation",
@@ -104,11 +79,9 @@ function isMatch(
   }
 
   return evaluationCase.expectedResults.some((expected) => {
-    const fileMatches =
-      !expected.file || result.file === expected.file;
+    const fileMatches = !expected.file || result.file === expected.file;
 
-    const symbolMatches =
-      !expected.symbol || result.symbol === expected.symbol;
+    const symbolMatches = !expected.symbol || result.symbol === expected.symbol;
 
     return fileMatches && symbolMatches;
   });
@@ -142,22 +115,17 @@ async function main() {
       intentCorrect++;
     }
 
-    const { path, results } =
-      await retrieveForEvaluation(evaluationCase);
+    const { path, results } = await retrieveForEvaluation(evaluationCase);
 
     const expectedPath = evaluationCase.expectedPath;
 
     if (expectedPath && path === expectedPath) {
       routingCorrect++;
     } else {
-      console.log(
-        `  ROUTING MISMATCH: expected ${expectedPath}, got ${path}`,
-      );
+      console.log(`  ROUTING MISMATCH: expected ${expectedPath}, got ${path}`);
     }
 
-    const rank = results.findIndex((result) =>
-      isMatch(result, evaluationCase),
-    );
+    const rank = results.findIndex((result) => isMatch(result, evaluationCase));
 
     const top1 = rank === 0;
     const top3 = rank >= 0 && rank < 3;
@@ -196,28 +164,20 @@ async function main() {
   console.log("========== EVALUATION ==========");
 
   console.log(
-    `Intent accuracy: ${(intentCorrect / total * 100).toFixed(2)}%`,
+    `Intent accuracy: ${((intentCorrect / total) * 100).toFixed(2)}%`,
   );
 
   console.log(
-    `Routing accuracy: ${(routingCorrect / total * 100).toFixed(2)}%`,
+    `Routing accuracy: ${((routingCorrect / total) * 100).toFixed(2)}%`,
   );
 
-  console.log(
-    `Top-1 accuracy: ${(top1Hits / total * 100).toFixed(2)}%`,
-  );
+  console.log(`Top-1 accuracy: ${((top1Hits / total) * 100).toFixed(2)}%`);
 
-  console.log(
-    `Top-3 accuracy: ${(top3Hits / total * 100).toFixed(2)}%`,
-  );
+  console.log(`Top-3 accuracy: ${((top3Hits / total) * 100).toFixed(2)}%`);
 
-  console.log(
-    `Top-5 accuracy: ${(top5Hits / total * 100).toFixed(2)}%`,
-  );
+  console.log(`Top-5 accuracy: ${((top5Hits / total) * 100).toFixed(2)}%`);
 
-  console.log(
-    `MRR: ${(reciprocalRankTotal / total).toFixed(4)}`,
-  );
+  console.log(`MRR: ${(reciprocalRankTotal / total).toFixed(4)}`);
 }
 
 main().catch((error) => {

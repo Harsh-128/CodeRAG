@@ -22,41 +22,41 @@ export function detectQueryIntent(query: string): QueryIntent {
   }
 
   /*
- * Questions asking which methods/functions belong
- * to a class are symbol-navigation questions.
- *
- * Example:
- *   Which methods belong to UserService?
- */
-if (
-  /\b(which|what)\s+(methods?|functions?)\s+(belong\s+to|of)\b/.test(
-    normalized,
-  )
-) {
-  return "symbol-navigation";
-}
+   * Questions asking which methods/functions belong
+   * to a class are symbol-navigation questions.
+   *
+   * Example:
+   *   Which methods belong to UserService?
+   */
+  if (
+    /\b(which|what)\s+(methods?|functions?)\s+(belong\s+to|of)\b/.test(
+      normalized,
+    )
+  ) {
+    return "symbol-navigation";
+  }
 
-/*
- * Explicit symbol-navigation questions asking where
- * a symbol or class is defined.
- */
-if (
-  /\b(where is|where are|find|locate|show me)\b/.test(normalized) &&
-  /\b(defined|definition)\b/.test(normalized)
-) {
-  return "symbol-navigation";
-}
+  /*
+   * Explicit symbol-navigation questions asking where
+   * a symbol or class is defined or implemented.
+   */
+  if (
+    /\b(where is|where are|find|locate|show me)\b/.test(normalized) &&
+    /\b(defined|definition|implemented|implementation)\b/.test(normalized)
+  ) {
+    return "symbol-navigation";
+  }
 
-/*
- * Explanatory symbol questions remain method questions.
- */
-if (
-  /\b(method|function|return|returns|get|gets|fetch|fetches|retrieve|retrieves|find|finds|calculate|calculates|call|calls)\b/.test(
-    normalized,
-  )
-) {
-  return "method";
-}
+  /*
+   * Explanatory symbol questions remain method questions.
+   */
+  if (
+    /\b(method|function|return|returns|get|gets|fetch|fetches|retrieve|retrieves|find|finds|calculate|calculates|call|calls)\b/.test(
+      normalized,
+    )
+  ) {
+    return "method";
+  }
 
   if (
     /\b(handle|handles|process|processes)\b/.test(normalized) &&
@@ -82,21 +82,32 @@ if (
   /*
    * Constructor questions.
    */
+  /*
+  /*
+ * Questions asking where an instance is created/instantiated
+ * are constructor questions and should use the normal RAG path.
+ */
   if (
-    /\b(construct|constructed|constructor|instantiate|instantiated|instance|created|create|new)\b/.test(
+    /\b(where is|where are|find|locate|show me)\b/.test(normalized) &&
+    /\b(created|create|instantiated|instantiation)\b/.test(normalized)
+  ) {
+    return "constructor";
+  }
+
+  /*
+   * Constructor questions.
+   */
+  if (
+    /\b(construct|constructed|constructor|instantiate|instance|new)\b/.test(
       normalized,
     )
   ) {
     return "constructor";
   }
 
-  /*
-   * Explicit symbol-navigation questions asking where
-   * a symbol or class is defined.
-   */
   if (
     /\b(where is|where are|find|locate|show me)\b/.test(normalized) &&
-    /\b(defined|definition)\b/.test(normalized)
+    /\b(defined|definition|implemented|implementation)\b/.test(normalized)
   ) {
     return "symbol-navigation";
   }
@@ -129,7 +140,7 @@ if (
     return "symbol-navigation";
   }
 
-    /*
+  /*
    * Repository questions.
    */
   if (
@@ -147,9 +158,7 @@ if (
    *   What does calculate_total do?
    *   What does hello do?
    */
-  if (
-    /\bwhat\s+does\s+[A-Za-z_$][A-Za-z0-9_$]*\s+(do|work)\b/i.test(query)
-  ) {
+  if (/\bwhat\s+does\s+[A-Za-z_$][A-Za-z0-9_$]*\s+(do|work)\b/i.test(query)) {
     return "method";
   }
 

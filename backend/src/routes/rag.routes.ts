@@ -71,10 +71,10 @@ export async function ragRoutes(app: FastifyInstance) {
         language,
       );
       if (
-          isSymbolNavigationQuestion(question) &&
-          queryIntent === "symbol-navigation" &&
-          symbolResults.length === 0
-        ) {
+        isSymbolNavigationQuestion(question) &&
+        queryIntent === "symbol-navigation" &&
+        symbolResults.length === 0
+      ) {
         return {
           question,
           repository: repositoryName ?? null,
@@ -86,9 +86,15 @@ export async function ragRoutes(app: FastifyInstance) {
       /*
        * 2. Symbol/navigation path
        */
-     if (queryIntent === "symbol-navigation" && symbolResults.length > 0) {
-        const symbolNavigationResponse =
-          buildSymbolNavigationResponse(question, symbolResults);
+      if (
+        symbolResults.length > 0 &&
+        queryIntent === "symbol-navigation" &&
+        isSymbolNavigationQuestion(question)
+      ) {
+        const symbolNavigationResponse = buildSymbolNavigationResponse(
+          question,
+          symbolResults,
+        );
 
         return {
           question,
@@ -289,13 +295,13 @@ export async function ragRoutes(app: FastifyInstance) {
         }));
 
       return {
-          question,
-          repository: repositoryName ?? null,
-          answer,
-          sources,
-          mode: "rag",
-          intent: queryIntent,
-        };
+        question,
+        repository: repositoryName ?? null,
+        answer,
+        sources,
+        mode: "rag",
+        intent: queryIntent,
+      };
     } catch (error) {
       app.log.error(error);
 
