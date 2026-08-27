@@ -242,6 +242,32 @@ if (
       if (isMethod) {
         bonus += 0.08;
       }
+            /*
+       * "Which method..." questions should strongly prefer
+       * actual methods/functions over classes, constructors,
+       * and test entry points.
+       */
+      if (isMethod && /\bwhich\s+method\b/.test(normalizedQuery)) {
+        bonus += 0.35;
+      }
+      /*
+        * "Which method..." questions should prefer the actual
+        * domain method over test/entry-point methods such as main().
+        */
+        if (
+          /\bwhich\s+method\b/.test(normalizedQuery) &&
+          isMethod &&
+          symbolName === "main"
+        ) {
+          bonus -= 0.25;
+        }
+
+      if (
+        /\b(fetch|retrieve|find)\b/.test(normalizedQuery) &&
+        isMethod
+      ) {
+        bonus += 0.10;
+      }
 
       // Strongly prefer methods/functions whose implementation
       // contains the operation explicitly requested by the user.
@@ -478,10 +504,10 @@ if (
       }
     }
 
-    return {
-      ...result,
-      score: result.score + bonus,
-    };
+return {
+  ...result,
+  score: result.score + bonus,
+};
   });
 
   const sortedResults = reranked

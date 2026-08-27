@@ -32,14 +32,14 @@ test("detects handle as a method when it is not request flow", () => {
 
 test("detects constructor questions", () => {
   assert.equal(
-    detectQueryIntent("Where is UserService instantiated?"),
+    detectQueryIntent("How is UserService constructed?"),
     "constructor",
   );
 });
 
 test("detects declaration questions", () => {
   assert.equal(
-    detectQueryIntent("Where is the UserService class defined?"),
+    detectQueryIntent("What is a UserService class?"),
     "declaration",
   );
 });
@@ -62,6 +62,41 @@ test("does not let class keyword override method intent", () => {
   assert.equal(
     detectQueryIntent("Which method in the UserService class fetches users?"),
     "method",
+  );
+});
+
+test("detects symbol navigation for called symbols", () => {
+  assert.equal(
+    detectQueryIntent("Where is getName called?"),
+    "symbol-navigation",
+  );
+});
+
+test("detects symbol navigation for used symbols", () => {
+  assert.equal(
+    detectQueryIntent("Where is UserService used?"),
+    "symbol-navigation",
+  );
+});
+
+test("detects symbol navigation for instantiated symbols", () => {
+  assert.equal(
+    detectQueryIntent("Where is UserService instantiated?"),
+    "symbol-navigation",
+  );
+});
+
+test("detects symbol navigation for defined symbols", () => {
+  assert.equal(
+    detectQueryIntent("Where is the UserService class defined?"),
+    "symbol-navigation",
+  );
+});
+
+test("detects symbol navigation for methods belonging to a class", () => {
+  assert.equal(
+    detectQueryIntent("Which methods belong to UserService?"),
+    "symbol-navigation",
   );
 });
 
