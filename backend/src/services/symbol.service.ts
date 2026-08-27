@@ -533,7 +533,7 @@ export async function lookupSymbolsForQuestion(
    * should prefer exact symbol lookup.
    */
   const usageQuestion =
-    /\b(used|usage|usages|referenced|references|reference|called|calls|invoked|invocations|instantiated|instantiation|created|creation)\b/.test(
+    /\b(use|used|usage|usages|referenced|references|reference|call|called|calls|invoked|invocations|instantiate|instantiated|instantiation|create|created|creation)\b/.test(
       normalized,
     );
 
@@ -622,9 +622,10 @@ export async function lookupSymbolsForQuestion(
   ]);
 
   const symbolName =
-    identifiers.find(
-      (identifier) => !ignoredWords.has(identifier.toLowerCase()),
-    ) ?? identifiers[0];
+    [...identifiers]
+      .reverse()
+      .find((identifier) => !ignoredWords.has(identifier.toLowerCase())) ??
+    identifiers[0];
 
   if (usageQuestion) {
     return findSymbolUsages(symbolName, repositoryName, language);

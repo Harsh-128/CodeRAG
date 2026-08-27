@@ -48,6 +48,25 @@ export function detectQueryIntent(query: string): QueryIntent {
   }
 
   /*
+   * Questions asking where a symbol is used, called,
+   * referenced, or created are navigation/creation questions.
+   *
+   * Examples:
+   *   Where does the application call getName?
+   *   Where does the application create a UserService object?
+   */
+  if (
+    /\b(where is|where are|where does|where do|find|locate|show me)\b/.test(
+      normalized,
+    ) &&
+    /\b(use|used|usage|call|called|calls|invoke|invoked|invokes|reference|referenced|references)\b/.test(
+      normalized,
+    )
+  ) {
+    return "symbol-navigation";
+  }
+
+  /*
    * Explanatory symbol questions remain method questions.
    */
   if (
