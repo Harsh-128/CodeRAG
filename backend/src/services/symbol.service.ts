@@ -577,6 +577,7 @@ export async function lookupSymbolsForQuestion(
     "does",
     "do",
     "invocations",
+    "instantiated",
     "instantiation",
     "where",
     "what",
