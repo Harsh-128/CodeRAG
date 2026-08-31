@@ -29,7 +29,7 @@ export function detectQueryIntent(query: string): QueryIntent {
    *   Which methods belong to UserService?
    */
   if (
-    /\b(which|what)\s+(methods?|functions?)\s+(belong\s+to|of)\b/.test(
+    /\b(which|what)\s+(methods?|functions?)\s+(belong|belongs)\s+to\b/.test(
       normalized,
     )
   ) {
@@ -64,6 +64,22 @@ export function detectQueryIntent(query: string): QueryIntent {
   }
 
   /*
+   * Questions asking where a symbol is instantiated or created
+   * are symbol-navigation questions.
+   *
+   * These must run before generic method detection because
+   * words such as "get" may appear in the same question.
+   */
+  if (
+    /\b(where is|where are|where does|where do|find|locate|show me)\b/.test(
+      normalized,
+    ) &&
+    /\b(instantiated|instantiation)\b/.test(normalized)
+  ) {
+    return "symbol-navigation";
+  }
+
+  /*
    * Explanatory symbol questions remain method questions.
    */
   if (
@@ -89,7 +105,9 @@ export function detectQueryIntent(query: string): QueryIntent {
    * constructor questions.
    */
   if (
-    /\b(where is|where are|find|locate|show me)\b/.test(normalized) &&
+    /\b(where is|where are|where does|where do|find|locate|show me)\b/.test(
+      normalized,
+    ) &&
     /\b(instantiated|instantiation)\b/.test(normalized)
   ) {
     return "symbol-navigation";
@@ -124,6 +142,17 @@ export function detectQueryIntent(query: string): QueryIntent {
   if (
     /\b(where is|where are|find|locate|show me)\b/.test(normalized) &&
     /\b(defined|definition|implemented|implementation)\b/.test(normalized)
+  ) {
+    return "symbol-navigation";
+  }
+
+  /*
+   * Explicit navigation questions asking where a symbol
+   * is declared should use symbol navigation.
+   */
+  if (
+    /\b(where is|where are|find|locate|show me)\b/.test(normalized) &&
+    /\b(declared|defined|implemented|implementation)\b/.test(normalized)
   ) {
     return "symbol-navigation";
   }
