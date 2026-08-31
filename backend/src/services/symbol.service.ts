@@ -358,6 +358,25 @@ export function isSymbolNavigationQuestion(question: string): boolean {
    * These questions are explicitly asking where a
    * symbol is defined, used, called, etc.
    */
+
+  /*
+   * Natural-language symbol navigation questions.
+   *
+   * Examples:
+   *   Where can I find UserService?
+   *   Which file contains getName?
+   *   Where was calculate_total declared?
+   *   Which methods belong to UserService?
+   */
+  const naturalLanguageNavigation =
+    /\b(?:where\s+(?:can\s+i|could\s+i|do\s+i)\s+find|which\s+file\s+contains|where\s+was|(?:which|what)\s+(?:methods?|functions?)\s+belong\s+to)\b/.test(
+      normalized,
+    );
+
+  if (naturalLanguageNavigation) {
+    return true;
+  }
+
   const directNavigation =
     /\b(defined|definition|implemented|implementation|created|creation|located|use|used|uses|usage|usages|referenced|references|reference|called|calls|invoked|invocations|instantiated|instantiation)\b/.test(
       normalized,
@@ -565,6 +584,26 @@ export async function lookupSymbolsForQuestion(
   /*
    * Otherwise look for code-like identifiers.
    */
+
+  /*
+   * Extract symbols from natural-language navigation questions.
+   *
+   * Examples:
+   *   Where can I find UserService?
+   *   Which file contains getName?
+   *   Where was calculate_total declared?
+   */
+  const naturalLanguageSymbolMatch = question.match(
+    /\b(?:where\s+(?:can\s+i|could\s+i|do\s+i)\s+find|which\s+file\s+contains|where\s+was)\s+([A-Za-z_$][A-Za-z0-9_$]*)\b/i,
+  );
+
+  if (naturalLanguageSymbolMatch) {
+    return findSymbol(
+      naturalLanguageSymbolMatch[1],
+      repositoryName,
+      language,
+    );
+  }
   const identifiers = question.match(/\b[A-Za-z_$][A-Za-z0-9_$]*\b/g);
 
   if (!identifiers || identifiers.length === 0) {

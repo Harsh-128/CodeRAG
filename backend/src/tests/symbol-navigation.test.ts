@@ -48,6 +48,37 @@ test("extracts the correct symbol from a natural-language question", async () =>
     "App.js"
   );
 });
+test("finds UserService from natural-language location question", async () => {
+  const results = await lookupSymbolsForQuestion(
+    "Where can I find UserService?",
+    "multilang",
+  );
+
+  assert.ok(results.length > 0);
+  assert.equal(results[0].payload.symbolName, "UserService");
+});
+
+test("finds getName from natural-language file question", async () => {
+  const results = await lookupSymbolsForQuestion(
+    "Which file contains getName?",
+    "multilang",
+  );
+
+  assert.ok(results.length > 0);
+  assert.equal(results[0].payload.symbolName, "getName");
+});
+
+test("finds calculate_total from natural-language declaration question", async () => {
+  const results = await lookupSymbolsForQuestion(
+    "Where was calculate_total declared?",
+    "multilang",
+  );
+
+  assert.ok(results.length > 0);
+  assert.equal(results[0].payload.symbolName, "calculate_total");
+  assert.equal(results[0].payload.filePath, "main.py");
+  assert.equal(results[0].payload.language, "python");
+});
 
 test("does not find nonexistent JavaScript getName", async () => {
   const results = await lookupSymbolsForQuestion(
