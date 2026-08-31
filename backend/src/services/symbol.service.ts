@@ -359,7 +359,7 @@ export function isSymbolNavigationQuestion(question: string): boolean {
    * symbol is defined, used, called, etc.
    */
   const directNavigation =
-    /\b(defined|definition|implemented|implementation|created|creation|located|used|usage|usages|referenced|references|reference|called|calls|invoked|invocations|instantiated|instantiation)\b/.test(
+    /\b(defined|definition|implemented|implementation|created|creation|located|use|used|uses|usage|usages|referenced|references|reference|called|calls|invoked|invocations|instantiated|instantiation)\b/.test(
       normalized,
     );
   const hasExplicitSymbol = /`[A-Za-z_$][A-Za-z0-9_$]*`/.test(question);
@@ -407,7 +407,9 @@ export function isSymbolNavigationQuestion(question: string): boolean {
       "constructor",
       "created",
       "located",
+      "use",
       "used",
+      "uses",
       "usage",
       "usages",
       "referenced",

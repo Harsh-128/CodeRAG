@@ -56,10 +56,7 @@ export function detectQueryIntent(query: string): QueryIntent {
    *   Where does the application create a UserService object?
    */
   if (
-    /\b(where is|where are|where does|where do|find|locate|show me)\b/.test(
-      normalized,
-    ) &&
-    /\b(use|used|usage|call|called|calls|invoke|invoked|invokes|reference|referenced|references)\b/.test(
+    /\b(use|used|uses|usage|usages|call|called|calls|invoke|invoked|invokes|invocation|invocations|reference|referenced|references)\b/.test(
       normalized,
     )
   ) {
