@@ -84,6 +84,7 @@ export function buildSymbolNavigationResponse(
   const symbolExtractionPatterns = [
     /`([A-Za-z_$][A-Za-z0-9_$]*)`/,
     /\b(?:where\s+is|where\s+are|find|locate)\s+([A-Za-z_$][A-Za-z0-9_$]*)\b/i,
+    /\b(?:where\s+(?:can\s+i|could\s+i|do\s+i)\s+find|which\s+file\s+contains|where\s+was)\s+([A-Za-z_$][A-Za-z0-9_$]*)\b/i,
     /(?:belong\s+to|of)\s+([A-Za-z_$][A-Za-z0-9_$]*)/i,
   ];
 
@@ -99,10 +100,23 @@ export function buildSymbolNavigationResponse(
   const isParentMethodQuestion =
     /\b(?:methods?|functions?)\s+(?:belong\s+to|of)\b/i.test(question);
 
+  const isNaturalLanguageLocationQuestion =
+    /\b(?:where\s+(?:can\s+i|could\s+i|do\s+i)\s+find|which\s+file\s+contains)\b/i.test(
+      question,
+    );
+
+  const isDeclarationLocationQuestion =
+    /\bwhere\s+was\b/i.test(question) &&
+    /\bdeclared\b/i.test(question);
+
   const answer = [
     isParentMethodQuestion
       ? `Methods belonging to \`${requestedSymbol}\`:`
-      : `The \`${requestedSymbol}\` is used in:`,
+      : isDeclarationLocationQuestion
+        ? `\`${requestedSymbol}\` is declared in:`
+        : isNaturalLanguageLocationQuestion
+          ? `\`${requestedSymbol}\` can be found in:`
+          : `The \`${requestedSymbol}\` is used in:`,
     ...symbolResults.slice(0, 10).map((result) => {
       const payload = result.payload;
 
