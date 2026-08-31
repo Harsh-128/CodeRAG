@@ -460,4 +460,53 @@ export const evaluationCases: EvaluationCase[] = [
       },
     ],
   },
+  {
+    id: "userservice-location-natural",
+    question: "Where can I find UserService?",
+    repository: "multilang",
+    expectedIntent: "symbol-navigation",
+    expectedPath: "symbol-navigation",
+    expectedResults: [
+      {
+        file: "UserService.ts",
+        symbol: "UserService",
+      },
+      {
+        file: "UserService.java",
+        symbol: "UserService",
+      },
+    ],
+  },
+
+  {
+    id: "getname-location-natural",
+    question: "Which file contains getName?",
+    repository: "multilang",
+    expectedIntent: "symbol-navigation",
+    expectedPath: "symbol-navigation",
+    expectedResults: [
+      {
+        file: "UserService.ts",
+        symbol: "getName",
+      },
+      {
+        file: "UserService.java",
+        symbol: "getName",
+      },
+    ],
+  },
+
+  {
+    id: "calculate-total-location-natural",
+    question: "Where was calculate_total declared?",
+    repository: "multilang",
+    expectedIntent: "symbol-navigation",
+    expectedPath: "symbol-navigation",
+    expectedResults: [
+      {
+        file: "main.py",
+        symbol: "calculate_total",
+      },
+    ],
+  },
 ];
