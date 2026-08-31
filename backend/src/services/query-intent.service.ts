@@ -41,8 +41,24 @@ export function detectQueryIntent(query: string): QueryIntent {
    * a symbol or class is defined or implemented.
    */
   if (
-    /\b(where is|where are|find|locate|show me)\b/.test(normalized) &&
+    /\b(where is|where are|where|find|locate|show me)\b/.test(normalized) &&
     /\b(defined|definition|implemented|implementation)\b/.test(normalized)
+  ) {
+    return "symbol-navigation";
+  }
+
+  /*
+   * Natural-language symbol location questions.
+   *
+   * Examples:
+   *   Where can I find UserService?
+   *   Which file contains getName?
+   *   Where was calculate_total declared?
+   */
+  if (
+    /\b(where\s+(?:can\s+i|could\s+i|do\s+i)\s+find|which\s+file\s+contains|where\s+was)\b/.test(
+      normalized,
+    )
   ) {
     return "symbol-navigation";
   }
