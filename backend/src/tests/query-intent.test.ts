@@ -86,6 +86,15 @@ test("detects symbol navigation for instantiated symbols", () => {
   );
 });
 
+test("detects symbol navigation for natural-language creation questions", () => {
+  assert.equal(
+    detectQueryIntent(
+      "Where does the application create a UserService object?",
+    ),
+    "symbol-navigation",
+  );
+});
+
 test("detects symbol navigation for defined symbols", () => {
   assert.equal(
     detectQueryIntent("Where is the UserService class defined?"),

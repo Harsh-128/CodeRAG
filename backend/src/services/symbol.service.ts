@@ -593,6 +593,19 @@ export async function lookupSymbolsForQuestion(
    *   Which file contains getName?
    *   Where was calculate_total declared?
    */
+
+  const naturalLanguageCreationMatch = question.match(
+    /\bwhere\s+(?:does|do)\s+(?:the\s+)?application\s+(?:create|creates)\s+(?:a|an|the)\s+([A-Za-z_$][A-Za-z0-9_$]*)\b/i,
+  );
+
+  if (naturalLanguageCreationMatch) {
+    return findSymbolUsages(
+      naturalLanguageCreationMatch[1],
+      repositoryName,
+      language,
+    );
+  }
+
   const naturalLanguageSymbolMatch = question.match(
     /\b(?:where\s+(?:can\s+i|could\s+i|do\s+i)\s+find|which\s+file\s+contains|where\s+was)\s+([A-Za-z_$][A-Za-z0-9_$]*)\b/i,
   );

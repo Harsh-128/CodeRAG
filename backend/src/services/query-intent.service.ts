@@ -96,6 +96,20 @@ export function detectQueryIntent(query: string): QueryIntent {
   }
 
   /*
+   * Questions asking where an application creates a specific
+   * symbol/object are symbol-navigation questions.
+   *
+   * Example:
+   *   Where does the application create a UserService object?
+   */
+  if (
+    /\b(where\s+(?:does|do|can|could)\b)/.test(normalized) &&
+    /\b(create|creates|created)\b/.test(normalized)
+  ) {
+    return "symbol-navigation";
+  }
+
+  /*
    * Explanatory symbol questions remain method questions.
    */
   if (
