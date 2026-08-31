@@ -56,7 +56,7 @@ export function detectQueryIntent(query: string): QueryIntent {
    *   Where was calculate_total declared?
    */
   if (
-    /\b(where\s+(?:can\s+i|could\s+i|do\s+i)\s+find|which\s+file\s+contains|where\s+was)\b/.test(
+    /\b(where\s+(?:can\s+i|could\s+i|do\s+i)\s+(?:find|locate)|which\s+file\s+(?:contains|has)|where\s+was)\b/.test(
       normalized,
     )
   ) {

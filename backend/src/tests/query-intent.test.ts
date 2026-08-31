@@ -95,6 +95,20 @@ test("detects symbol navigation for natural-language creation questions", () => 
   );
 });
 
+test("detects symbol navigation for natural-language locate questions", () => {
+  assert.equal(
+    detectQueryIntent("Where can I locate UserService?"),
+    "symbol-navigation",
+  );
+});
+
+test("detects symbol navigation for natural-language file questions", () => {
+  assert.equal(
+    detectQueryIntent("Which file has the getName implementation?"),
+    "symbol-navigation",
+  );
+});
+
 test("detects symbol navigation for defined symbols", () => {
   assert.equal(
     detectQueryIntent("Where is the UserService class defined?"),
